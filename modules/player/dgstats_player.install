@@ -1,0 +1,102 @@
+<?php
+/**
+ *  Project: Drupal Ghost Stats
+ *
+ *  Copyright (C) 2009 Oier Bravo Urtasun
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Affero General Public License as
+ *    published by the Free Software Foundation, either version 3 of the
+ *    License, or (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/**
+ * Implementation of hook_install() 
+ */function dgstats_player_install() {
+    drupal_install_schema('dgstats_player');
+}
+
+
+/**
+ * Implementation of hook_unistall()
+ */
+function dgstats_player_unistall() {
+    drupal_uninstall_schema('dgstats_player');
+}
+function dgstats_player_schema(){
+
+  $schema = array();
+$schema = array();
+
+  $schema['dgstats_player_evolution'] = array(
+    'fields' => array(
+//      'evid'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'serialize' => true),
+      'gameid'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE),
+      'playername'    => array('type' => 'varchar', 'length' => 15, 'not null' => TRUE, 'default' => ''),
+      'points'      => array('type' => 'float', 'not null' => TRUE),
+      'datetime'  => array('type' => 'datetime'),
+      'games'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'wins'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'losses'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'kills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'deaths'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'assists'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'creepkills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'creepdenies'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'neutralkills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'towerkills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'raxkills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'result'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+    ),
+//    'primary key' => array('dotaplayerid'),
+//    'indexes' => array(
+//      'playername' => array('playername'),
+//    ),
+    'unique keys' => array(
+      'playername_gameid' => array('playername', 'gameid'),
+      ),
+
+  );
+  $schema['dgstats_player'] = array(
+    'fields' => array(
+      'uid'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'playername' => array('type' => 'varchar', 'length' => 15, 'not null' => TRUE, 'default' => ''),
+      'points'      => array('type' => 'float', 'not null' => TRUE),
+      'games'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'wins'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'losses'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'kills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'deaths'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'assists'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'creepkills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'creepdenies'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'neutralkills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'towerkills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'raxkills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+
+      'sumkills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'sumdeaths'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'sumassists'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'sumcreepkills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'sumcreepdenies'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'sumneutralkills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'sumtowerkills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'sumraxkills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+
+    ),
+    'primary key' => array('playername'),
+    'indexes' => array(
+        'playername' => array('playername'),
+//        'uid' => array('uid'),
+    ),
+  );
+
+  return $schema;
+}

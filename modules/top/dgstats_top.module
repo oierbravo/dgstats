@@ -1,0 +1,364 @@
+<?php
+/**
+ *  Project: Drupal Ghost Stats
+ *
+ *  Copyright (C) 2009 Oier Bravo Urtasun
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Affero General Public License as
+ *    published by the Free Software Foundation, either version 3 of the
+ *    License, or (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+define('DGSTATS_TOP_NUM',5);
+
+function dgstats_top_menu() {
+  $items['test-tops'] = array(
+    'title' => 'test dgstats',
+    'page callback' => 'dgstats_testpage_tops',
+    'access arguments' =>array('access ghost stats'),
+  );
+  return $items;
+}
+function dgstats_testpage_tops(){
+  $output = '';
+  //dpm(_get_top_gamers());
+  //dpm(_get_top_killers()  );
+//  dpm(_get_top_winners());
+ // dpm(_get_top_loaders());
+$tops = dgstats_tops_get_tops();
+$records = dgstats_tops_get_records();
+
+ dpm($tops);
+ dpm($records);
+ $output .= theme('tops_lists',$tops);
+ $output .= theme('records_lists',$records);
+ 
+  return $output;
+}
+
+function _get_top_gamers(){
+  $sql = "select name, count(gameid) as games from gameplayers GROUP by name ORDER BY count(gameid) DESC LIMIT %d";
+
+$result = db_query($sql,DGSTATS_TOP_NUM);
+$top = array();
+while($row = db_fetch_array($result)){
+  $top[] = $row;
+}
+
+  return $top;
+}
+
+function _get_top_winner(){
+  $sql = "select gp.name,
+count(dp.gameid) as games,
+count(if(((dg.winner = 1 and gp.colour < 6) or (dg.winner = 2 and gp.colour > 6)),1,NULL)) as wins,
+  count(if(((dg.winner = 1 and gp.colour > 6) or (dg.winner = 2 and gp.colour < 6)),1,NULL)) as losses,
+  count(if(((dg.winner = 0)),1,NULL)) as draws
+
+from gameplayers as gp
+INNER JOIN dotaplayers as dp ON dp.gameid = gp.gameid AND dp.colour = gp.colour
+INNER JOIN dotagames as dg ON dg.gameid = gp.gameid
+GROUP BY gp.name
+ORDER BY wins";
+
+  $sql .= " DESC LIMIT %d";
+  $result = db_query($sql,DGSTATS_TOP_NUM);
+$top = array();
+while($row = db_fetch_array($result)){
+  $top[] = $row;
+}
+
+  return $top;
+}
+
+function _get_top_killers(){
+    $mingames = variable_get('dgstats_config_listmingames',4);
+  $sql = "
+select * from (
+select gp.name,SUM(dp.kills) as sumkills,AVG(dp.kills) as avgkills, COUNT(gp.gameid) as games from gameplayers as gp
+INNER JOIN dotaplayers as dp ON dp.gameid = gp.gameid AND dp.colour = gp.colour
+GROUP BY gp.name
+)as aaa where aaa.games >= $mingames 
+ORDER BY avgkills";
+
+$sql .= " DESC LIMIT %d";
+  $result = db_query($sql,DGSTATS_TOP_NUM);
+$top = array();
+while($row = db_fetch_array($result)){
+  $top[] = $row;
+}
+
+  return $top;
+}
+function _get_top_feeders(){
+    $mingames = variable_get('dgstats_config_listmingames',4);
+  $sql = "
+     select * from (
+        select gp.name,SUM(dp.deaths) as sumdeaths,AVG(dp.deaths) as avgdeaths, COUNT(gp.gameid) as games from gameplayers as gp
+          INNER JOIN dotaplayers as dp ON dp.gameid = gp.gameid AND dp.colour = gp.colour
+
+          GROUP BY gp.name
+)as aaa where aaa.games >= $mingames
+          ORDER BY avgdeaths";
+
+$sql .= " DESC LIMIT %d";
+  $result = db_query($sql,DGSTATS_TOP_NUM);
+$top = array();
+while($row = db_fetch_array($result)){
+  $top[] = $row;
+}
+
+  return $top;
+}
+function _get_record_kills(){
+  $sql = "select gp.name, g.gamename,g.id, g.datetime, dp.kills from gameplayers as gp
+INNER JOIN dotaplayers as dp ON gp.gameid = dp.gameid AND gp.colour = dp.colour
+INNER JOIN games as g ON g.id = gp.gameid
+ORDER BY dp.kills DESC LIMIT %d";
+
+  $result = db_query($sql,DGSTATS_TOP_NUM);
+  $kills = array();
+  while($row = db_fetch_array($result)){
+    $kills[] = $row;
+  }
+
+
+  return $kills;
+}
+function _get_record_feeds(){
+  $sql = "select gp.name, g.gamename,g.id, g.datetime, dp.deaths from gameplayers as gp
+INNER JOIN dotaplayers as dp ON gp.gameid = dp.gameid AND gp.colour = dp.colour
+INNER JOIN games as g ON g.id = gp.gameid
+ORDER BY dp.deaths DESC LIMIT %d";
+
+  $result = db_query($sql,DGSTATS_TOP_NUM);
+  $feeds = array();
+  while($row = db_fetch_array($result)){
+    $feeds[] = $row;
+  }
+
+
+  return $feeds;
+}
+
+function _get_record_deaths(){
+
+}
+function _get_record_loaders(){
+$sql = "select gp.name, gp.loadingtime, g.gamename, g.datetime,g.id from gameplayers as gp
+INNER JOIN games as g ON gp.gameid = g.id
+WHERE loadingtime > 0
+ORDER BY loadingtime ASC LIMIT %d";
+    $result = db_query($sql,DGSTATS_TOP_NUM);
+$record = array();
+while($row = db_fetch_array($result)){
+  $record[] = $row;
+}
+
+  return $record;
+}
+/**
+ * Implementation of hook_block()
+ */
+function dgstats_top_block($op='list', $delta=0, $edit=array()) {
+  switch ($op) {
+    case 'list':
+    $blocks[DGSTATS_BLOCK_TOPS] = array(
+        'info'       => t('DGStats Tops'),
+      );
+       $blocks[DGSTATS_BLOCK_RECORDS] = array(
+        'info'       => t('DGStats Records'),
+      );
+      return $blocks;
+    case 'view':
+       $block['subject'] = dgstats_top_block_subject($delta);
+          // The content of the block is typically generated by calling a custom
+          // function.
+          $block['content'] = dgstats_top_block_content($delta);
+
+          return $block;
+          
+    case 'configure':
+
+      $form = array();
+      return $form;
+    case 'save':
+
+      return;
+
+  }
+}
+
+function dgstats_top_block_content($delta){
+  switch ($delta) {
+        case DGSTATS_BLOCK_TOPS:
+          $tops = dgstats_tops_get_tops();
+          return theme('tops_lists',$tops);
+          break;
+        case DGSTATS_BLOCK_RECORDS:
+          $records = dgstats_tops_get_records();
+          return theme('records_lists',$records);
+          break;
+        default:
+          break;
+  }
+}
+function dgstats_top_block_subject($delta){
+ switch ($delta) {
+        case DGSTATS_BLOCK_TOPS:
+          return t('Tops');
+          break;
+        case DGSTATS_BLOCK_RECORDS:
+          return t('Records');
+          break;
+        default:
+          break;
+  }
+}
+define('DGSTATS_BLOCK_TOPS',0);
+define('DGSTATS_BLOCK_RECORDS',1);
+function dgstats_tops_get_tops(){
+  $tops = array(
+    'gamer' => _get_top_gamers(),
+    'killer' => _get_top_killers(),
+    'feeder' => _get_top_feeders(),
+    
+   );
+   return $tops;
+}
+function dgstats_tops_get_records(){
+  $tops = array(
+    'kills' => _get_record_kills(),
+    'feeds' => _get_record_feeds(),
+      'loader' => _get_record_loaders(),
+
+   );
+   return $tops;
+}
+
+/**
+ * Implementation of hook_theme()
+ */
+function dgstats_top_theme($existing, $type, $theme, $path) {
+    return array(
+      'records_lists' => array(
+         'arguments' => array('records' => null),
+        ),
+       'tops_lists' => array(
+         'arguments' => array('tops' => null),
+        ),
+        'tops_gamer' => array(
+         'arguments' => array('gamer' => null),
+        ),
+         'tops_winner' => array(
+         'arguments' => array('winner' => null),
+        ),
+          'tops_killer' => array(
+         'arguments' => array('winner' => null),
+        ),
+          'tops_feeder' => array(
+         'arguments' => array('feeder' => null),
+        ),
+         'records_loader' => array(
+         'arguments' => array('loader' => null),
+        ),
+        'records_kills' => array(
+         'arguments' => array('kills' => null),
+        ),
+        'records_feeds' => array(
+         'arguments' => array('feed' => null),
+        ),
+
+
+    );
+}
+function theme_records_lists($records){
+   $output = '';
+  //$output .= '<h3>Records</h3>';
+  //$output .= '<ul>';
+  foreach($records as $key => $values){
+    //$output .= '<li>';
+    $output .= '<h4>' . strtoupper($key) . '</h4>';
+    $output .= '<ul>';
+    foreach($values as $player){
+      $output .= '<li>';
+      $output .= theme('records_' . $key , $player);
+      $output .= '</li>';
+
+    }
+
+    $output .= '</ul>';
+    //$output .= '</li>';
+  }
+
+  //$output .= '</ul>';
+  return $output;
+}
+function theme_tops_lists($tops){
+//  dpm($tops);
+   $output = '';
+ // $output .= '<h3>Tops</h3>';
+ // $output .= '<ul>';
+  foreach($tops as $key => $values){
+  //  $output .= '<li>';
+    $output .= '<h4>' . strtoupper($key) . '</h4>';
+    $output .= '<ul>';
+    foreach($values as $player){
+      $output .= '<li>';
+      $output .= theme('tops_' . $key , $player);
+      $output .= '</li>';
+
+    }
+
+    $output .= '</ul>';
+   // $output .= '</li>';
+  }
+
+  $output .= '</ul>';
+  return $output;
+}
+
+function theme_tops_gamer($gamer){
+  $output = '';
+  $output .= $gamer['games'] . ' - ' . theme('playername',$gamer['name']);
+  return $output;
+}
+function theme_tops_winner($winner){
+  $output = '';
+  $output .= $winner['wins'] . ' - ' . theme('playername',$winner['name']);
+  return $output;
+}function theme_tops_killer($killer){
+  $output = '';
+  $media = round($killer['sumkills'] / $killer['games']);
+  $output .= $killer['sumkills']."($media)" . ' - ' . theme('playername',$killer['name']);
+  return $output;
+}
+function theme_tops_feeder($killer){
+  $output = '';
+  $media = round($killer['sumdeaths'] / $killer['games']);
+  $output .= $killer['sumdeaths']."($media)" . ' - ' . theme('playername',$killer['name']);
+  return $output;
+}
+function theme_records_loader($loader){
+  $output = '';
+  $output .=$loader['loadingtime']/1000 . ' - ' . theme('playername',$loader['name']) . ' | ' .theme('gamename',$loader['gamename'],$loader['id']);
+  return $output;
+}
+function theme_records_kills($kills){
+  $output = '';
+$output .= $kills['kills'] . ' - ' . theme('playername',$kills['name']) . ' | ' . theme('gamename',$kills['gamename'],$kills['id']);
+  return $output;
+}
+function theme_records_feeds($feed){
+  $output = '';
+$output .= $feed['deaths'] . ' - ' . theme('playername',$feed['name']) . ' | ' .theme('gamename',$feed['gamename'],$feed['id']);
+  return $output;
+}

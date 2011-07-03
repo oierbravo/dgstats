@@ -1,0 +1,185 @@
+<?php
+function dgstats_favgame_get_favs($uid){
+    $sql = "select * from {dgstats_favgame} where uid = %d";
+    $result = db_query($sql,$uid);
+    $favs = array();
+    while($row = db_fetch_array($result)){
+        $favs[] = $row;
+    }
+    return $favs;
+}
+function _dgstats_is_fav($uid,$gameid){
+//    dpm(func_get_args());
+    $sql = "SELECT count(*) from {dgstats_favgame} where uid = %d AND gameid = %d";
+    $result = db_query($sql,$uid,$gameid);
+    $fav = db_result($result);
+    if($fav == 0){
+        return FALSE;
+    } else {
+        return TRUE;
+    }
+
+}
+function _dgstats_favgame_set($uid,$gameid,$description = ''){
+    $sql = "REPLACE INTO {dgstats_favgame} (uid,gameid,description) VALUES (%d,%d,'%s')";
+    db_query($sql,$uid,$gameid,$description);
+
+}
+function _dgstats_favgame_remove($uid,$gameid){
+    $sql = "DELETE FROM {dgstats_favgame} WHERE uid = %d AND gameid = %d";
+    db_query($sql,$uid,$gameid);
+    
+}
+function dgstats_favgame_menu(){
+    $items = array();
+    $items['user/%user/favgames'] = array(
+        'title' => 'Favorite games',
+    'page callback' => 'dgstats_favgames_page',
+    'access arguments' =>array('access fav games'),
+    'page arguments' => array(1),
+        'type' => MENU_LOCAL_TASK,
+    );
+    $items['dgstats/js/favgame/%/%'] = array(
+//        'title' => 'Fav games',
+    'page callback' => 'dgstats_favgames_page_js',
+    'access arguments' =>array('access fav games'),
+    'page arguments' => array(3,4),
+        'type' => MENU_CALLBACK,
+    );
+//      $items[DGSTATS_PAGE_GAMES . '/%game/favgame'] = array(
+////    'title' => t('Details'),
+//    'page callback' => 'dgstats_favgames_page_js',
+//    'page arguments' => array(1),
+//    'access arguments' =>array('access fav games'),
+//    'type' => MENU_CALLBACK,
+//  );
+//     $items[DGSTATS_PAGE_GAMES . '/%game/favgame/%'] = array(
+////    'title' => t('Details'),
+//    'page callback' => 'dgstats_favgames_page_js',
+//    'page arguments' => array(1,3),
+//    'access arguments' =>array('access fav games'),
+//    'type' => MENU_CALLBACK,
+//  );
+//     dpm($items);
+    return $items;
+}
+function dgstats_testpage_favs(){
+    return 'TEST';
+}
+function dgstats_favgames_page($user){
+    $favgames = dgstats_favgame_get_favs($user->uid);
+//    dpm($favgames);
+    if(empty($favgames)){
+      return "No games";
+    }
+      $rows = array();
+    foreach($favgames as $favgame){
+        $rows[] = game_load($favgame['gameid'] );
+    }
+    $headers = _dgstats_get_table_header('games');
+//  dpm($games);
+  $formated_games = dgstats_format_table($headers,$rows);
+  //$formated_games = dgstats_format_games($games);
+  $output .= theme('table',$headers,$formated_games);
+  $output .= theme('pager');
+
+    return $output;
+    
+}
+/**
+ * Implementation of hook_perm()
+ */
+function dgstats_favgame_perm() {
+    return array('access fav games');
+}
+
+function dgstats_favgames_page_js($gameid,$op){
+    global $user;
+
+    switch($op){
+        case 'remove':
+            _dgstats_favgame_remove($user->uid,$gameid);
+            $output = theme('favgame',FALSE,$gameid);
+            break;
+        case 'set':
+            _dgstats_favgame_set($user->uid,$gameid);
+            $output = theme('favgame',TRUE,$gameid);
+            break;
+
+    }
+    
+    print $output;
+    exit;
+}
+function dgstats_favgame_dgstatstable_alter(&$headers){
+ if(user_access('access fav games')){
+        $headers['games'][] = array('data' => 'Fav','field' => 'favgame','theme' => 'favgame','theme arguments' => 'favgame,id');
+//     $headers['games'][] = array('data' => 'Fav','field' => 'favgame');
+ }
+}
+function dgstats_favgame_game_alter(&$game){
+//    dpm($game);
+    global $user;
+    if(user_access('access fav games')){
+     $game['favgame'] = _dgstats_is_fav($user->uid,$game['id']);
+    }
+//   dpm($game);
+}
+function dgstats_favgame_theme(){
+    return array(
+        'favgame' => array(
+            'arguments' => array('isfav' => null,'gameid' => null),
+        ),
+    );
+}
+function dgstats_favgame_init(){
+    drupal_add_js(drupal_get_path('module','dgstats_favgame') . '/favgame.js');
+}
+function theme_favgame($isfav,$gameid){
+//    dpm('th');
+    if(!$isfav){
+        $class = 'favgame-false';
+    } else {
+         $class = 'favgame-true';
+    }
+    $output = '<div class="favgame-btn ' . $class . '" gameid="' . $gameid . '">';
+    if(!$isfav){
+        $output .= theme('icono','favgame-false');
+    } else {
+        $output .= theme('icono','favgame-true');
+    }
+    $output .= '</div>';
+    return $output;
+}
+function dgstats_favgame_iconos(){
+    $iconos = array();
+    $iconos['favgame-true'] = array(
+    'title' => 'TRUE',
+    'src' => 'images/tango/32/emblem-favorite.png',
+  );
+    $iconos['favgame-false'] = array(
+    'title' => 'FALSE',
+    'src' => 'images/tango/32/emblem-favorite-grey.png',
+  );
+    return $iconos;
+}
+
+function dgstats_favgame_dgstatsgame($op,$game){
+  switch($op){
+    case 'load':
+
+      return array();
+      break;
+    case 'view':
+
+//    dpm(dgatats_replay_get_download_count($game['id']));
+       return array(
+        'favgame' => array(
+          '#title' => 'Favorite',
+          '#output' => theme('favgame',$game['favgame'],$game['id']),
+          '#weight' => 0,
+        ),
+      );
+      break;
+  }
+}

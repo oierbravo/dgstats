@@ -1,0 +1,934 @@
+<?php
+/**
+ *  Drupal Ghost Stats: Game module
+ *
+ *  This modules contains most game related task.
+ *  Its part of the required modules.
+ *
+ *  Copyright (C) 2009 Oier Bravo Urtasun
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Affero General Public License as
+ *    published by the Free Software Foundation, either version 3 of the
+ *    License, or (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+define('DGSTATS_PAGE_GAMES','games');
+
+define('DGSTATS_GAME_STATUS_NON_PROCESSED',0);
+define('DGSTATS_GAME_STATUS_PROCESSED',1);
+define('DGSTATS_GAME_STATUS_PROCESSING',2);
+function dgstats_game_menu() {
+
+  $items[DGSTATS_PAGE_GAMES] = array(
+    'title' => 'Games',
+    'page callback' => 'dgstats_games_page',
+    'access arguments' =>array('access ghost stats'),
+    'menu_name' => 'primary-links',
+  );
+  $items[DGSTATS_PAGE_GAMES . '/%game'] = array(
+    'title' => t('Details'),
+    'page callback' => 'dgstats_game_page',
+    'page arguments' => array(1),
+    'access arguments' =>array('access ghost stats'),
+//     'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+  $items[DGSTATS_PAGE_GAMES . '/%game/details'] = array(
+    'title' => t('Details'),
+    'page callback' => 'dgstats_game_page',
+    'page arguments' => array(1),
+    'access arguments' =>array('access ghost stats'),
+     'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+  $items['config/game'] = array(
+    'title' => 'Process games',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('dgstats_game_process_games_form'),
+    'access arguments' => array('administer ghost stats'),
+//    'type' => ME,
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['config/game/process-games'] = array(
+    'title' => 'Process games',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('dgstats_game_process_games_form'),
+    'access arguments' => array('administer ghost stats'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+  $items['process-games-external'] = array(
+    'title' => '',
+    'page callback' => 'dgstats_game_process_remaining_games',
+    'access arguments' => array('access external game processing'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+function dgstats_game_perm(){
+  return array(
+    'access external game processing',
+
+  );
+}
+//function dgstats_format_gameplayer($player){
+//  $formated_player = array();
+//  /* array('data' => 'name','field' => 'name'),
+//  array('data' => 'hero','field' => 'hero'),
+//  array('data' => 'team','field' => 'team'),
+//  array('data' => 'kills','field' => 'kills'),
+//  array('data' => 'deaths','field' => 'deaths'),
+//  array('data' => 'assists','field' => 'assists'),
+//  array('data' => 'creepkills','field' => 'creepkills'),
+//  array('data' => 'creepdenies','field' => 'creepdenies'),
+//  array('data' => 'neutralkills','field' => 'neutralkills'),
+//  array('data' => 'towerkills','field' => 'towerkills'),
+//  array('data' => 'gold','field' => 'gold'),
+//  array('data' => 'items'),
+//  array('data' => 'left','field' => 'left'),
+//  array('data' => 'leftreason','field' => 'leftreason'),*/
+//  $formated_player[] = theme('playername',$player['name']);
+//  $formated_player[] = theme('hero',($player['hero']));
+//  $formated_player[] = theme('team',$player['team'],'game-player');
+//  $formated_player[] = $player['kills'];
+//  $formated_player[] = $player['deaths'];
+//  $formated_player[] = $player['assists'];
+//  $formated_player[] = $player['creepkills'];
+//  $formated_player[] = $player['creepdenies'];
+//  $formated_player[] = $player['neutralkills'];
+//  $formated_player[] = $player['towerkills'];
+//  $formated_player[] = $player['gold'];
+//  $formated_player[] = array('align'=>'center', 'aligwidth'=>  '170px','data'=>theme_dotaitems_group(array(
+//         theme('dotaitem',($player['item1'])),
+//         theme('dotaitem',($player['item2'])),
+//         theme('dotaitem',($player['item3'])),
+//         theme('dotaitem',($player['item4'])),
+//         theme('dotaitem',($player['item5'])),
+//         theme('dotaitem',($player['item6'])),
+//       )));
+//  $formated_player[] = theme('game_left',$player['left']);
+//  $formated_player[] = theme('game_leftreason',$player['leftreason']);
+//
+//  $class = array();
+//
+//  if($player['team'] == $player['winner'] -1){
+//    $class[] = 'winner';
+//  } elseif($player['winner'] == 0){
+//    $class[] = '';
+//  } else {
+//    $class[] = 'losser';
+//  }
+//  if($player['team'] == 0){
+//    //sentinel
+//    $class[] = 'sentinel';
+//  } else {
+//    $class[] = 'scourge';
+//  }
+//  $class_str = implode(' ',$class);
+//  return array('data' => $formated_player, 'class' => $class_str);
+//}
+
+function dgstats_game_page($game){
+  $breadcrumb = drupal_get_breadcrumb();
+  $breadcrumb[] = l(t('Games'),DGSTATS_PAGE_GAMES);
+//  dpm($game);
+  drupal_set_breadcrumb($breadcrumb);
+ 
+  $output = '';
+
+  drupal_set_title($game['gamename']);
+  $game_view = module_invoke_all('dgstatsgame','view',$game);
+  
+
+  $game_view['details'] = array(
+        '#title' => 'Details',
+        '#output' => theme('game_details',$game),
+        '#weight' => 0,
+      );
+//  dpm($game_view);
+  uasort($game_view, 'element_sort');
+  $output = theme('game',$game_view);
+//  $output .= '<h3>Players<h3>';
+//  $output .= theme('table',$header_players,$formated_players);
+  return $output;
+}
+function game_load($gameid){
+  if(!is_numeric($gameid)){
+   return false;
+  }
+
+  $sql = 'SELECT g.id,gamename,datetime,winner,ownername,duration from {games} g INNER JOIN {dotagames} dg WHERE dg.gameid = g.id AND g.id = %d';
+  $game = db_fetch_array(db_query($sql,$gameid));
+
+  $players = dgstats_get_game_players($gameid);
+  
+  $game['players'] = $players;
+  $extra = module_invoke_all('dgstatsgame','load',$game);
+  foreach($extra as $key => $val){
+    $game[$key] = $val;
+  }
+//  $game['favgame'] = true;
+
+  drupal_alter('game',$game);
+  return $game;
+  return $gameid;
+
+}
+function dgstats_game_dgstatstable(){
+  return array(
+    'games' => array (
+      array('data' => 'ID','field' => 'id'),
+        array('data' => 'Name','field' => 'gamename','theme' => 'gamename','theme arguments' => 'gamename,id'),
+//      array('data' =>  'Map','field' => 'map','theme' => 'game_map','theme arguments' => 'map'),
+      array('data' => 'Duration','field' => 'duration','theme' => 'game_duration','theme arguments' => 'duration'),
+      array('data' => 'Winner','field' => 'winner','theme' => 'game_winner','theme arguments' => 'winner'),
+      array('data' =>  'Datetime','field' =>  'datetime','sort'=> 'desc'),
+      array('data' => 'Ownername','field' => 'ownername','theme' => 'playername','theme arguments' => 'ownername'),
+    ),
+    'game_players' => array(
+      array('data' => 'Name','field' => 'playername','theme' => 'playername','theme arguments' => 'playername'),
+      array('data' => 'Hero','field' => 'hero','theme' => 'hero','theme arguments' => 'hero'),
+      array('data' => 'Team','field' => 'team','sort'=> 'desc','theme' => 'team','theme arguments' => 'team'),
+      array('data' => 'Kills','field' => 'kills'),
+      array('data' => 'Deaths','field' => 'deaths'),
+      array('data' => 'Assists','field' => 'assists'),
+      array('data' => 'CK','field' => 'creepkills'),
+      array('data' => 'CD','field' => 'creepdenies'),
+      array('data' => 'NK','field' => 'neutralkills'),
+      array('data' => 'TK','field' => 'towerkills'),
+      array('data' => 'Gold','field' => 'gold'),
+      array('data' => 'Items','width'=>  '170px','theme' => 'dotaitems_group','theme arguments'=>'item1,item2,item3,item4,item5,item6'),
+      array('data' => 'Left','field' => 'left','theme' => 'game_left','theme arguments' => 'left'),
+//      array('data' => 'Left reason','theme' => 'game_leftreason','theme arguments' => 'leftreason'),
+
+    ),
+    'player_games' => array(
+      array('data' =>  'Datetime','field' =>  'datetime','sort'=> 'desc'),
+      array('data' => 'Name','field' => 'gamename','theme' => 'gamename','theme arguments' => 'gamename,id'),
+      array('data' => 'Duration','field' => 'duration','theme' => 'time_seconds','theme arguments' => 'duration'),
+      array('data' => 'Team','field' => 'team','theme' => 'team','theme arguments' => 'team'),
+      array('data' => 'Hero','field' => 'hero','theme' => 'hero','theme arguments' => 'hero'),
+      array('data' => 'Kills','field' => 'kills'),
+      array('data' =>'Deaths','field' => 'deaths'),
+      array('data' => 'Assists','field' => 'assists'),
+      array('data' => 'Result','field' => 'result','theme' => 'gameresult','theme arguments' => 'result'),
+    ),
+  );
+
+}
+function dgstats_game_preprocess_game(&$variables,$hook){
+}
+
+function theme_gameresult($gameresult){
+  $res = array(
+    'DRAW' => 0,
+    'WON' => 1,
+    'LOST' => 2,
+  );
+
+
+  $output = '';
+  
+   $output .= theme('icono','result-' . $res[$gameresult]);
+
+  return $output;
+}
+function theme_game_left($left){
+  $output = '';
+
+  $mins = round($left /60);
+  $secs = round($left%60);
+
+  $output .= "$mins:$secs";
+  return $output;
+}
+function theme_game_leftreason($reason){
+  $output = '';
+
+  $str = str_split($reason, 10);
+  $output .= $str[0] . '...';
+  return $output;
+}
+function theme_game_datetime($datetime){
+  $output = '';
+  $output .= theme('icono','calendar');
+  $output .= $datetime;
+  return $output;
+}
+function theme_game_creator($creator){
+  $output = '';
+   $output .= theme('icono','admin');
+//  $output .= 'Creator: ';
+$output .= $creator;
+  return $output;
+}
+function theme_game_duration($duration,$icono = true){
+  $output = '';
+  $formated_duration = dgstats_convert_time($duration);
+  if($icono)
+    $output .= theme('icono','time');
+  $output .= $formated_duration;
+  return $output;
+}
+function dgstats_convert_time($duration,$separator = ':'){
+  if(is_array($duration)){
+    $out = $duration['min'] . $separator . $duration['sec'];
+  } elseif(is_string($duration)){
+
+    $mins = round(intval($duration) /60);
+    $secs = round(intval($duration)%60);
+    $out = $mins . $separator . $secs;
+
+  } elseif(is_string($duration) && strstr($separator,$duration)){
+    $out = $duration;
+  }
+  return $out;
+}
+function theme_game_winner($winner,$type = 'simple'){
+  $output = '';
+  $ico_name = 'winner-' . $winner;
+  $output .= theme('icono',$ico_name);
+  switch($type){
+    case 'simple':
+      
+      break;
+    case 'long':
+      if($winner == 1) {
+
+        $output .= 'Sentinel wins';
+      } elseif ($winner ==2) {
+        $output .= 'Scourge wins';
+      } else {
+        $output .= 'Draw';
+      }
+      break;
+
+  }
+
+    return $output;
+  }
+function theme_game_map($map){
+
+    //
+    $map_processed = str_replace('Maps\\Download\\', '',$map);
+    $map_processed = str_replace('.w3x','',$map_processed);
+    
+$output = '';
+$output .= basename($map_processed);
+  return $output;
+}
+
+function theme_gamename($gamename,$id){
+   $output = '';
+   $output .= l($gamename,DGSTATS_PAGE_GAMES .'/' . $id) ;
+   return $output;
+}
+function theme_game_time($min,$sec){
+  $output = '';
+  $output .= "$min:$sec";
+  return $output;
+}
+function dgstats_game_theme(){
+  return array(
+   'game' => array(
+      'arguments' => array('game' => null),
+      'template' => 'game',
+    ),
+     'gameresult' => array(
+      'arguments' => array('gameresult' => null),
+    ),
+     'game_left' => array(
+      'arguments' => array('left' => null),
+    ),
+      'game_leftreason' => array(
+      'arguments' => array('reason' => null),
+    ),
+      'game_datetime' => array(
+      'arguments' => array('datetime' => null),
+    ),
+      'game_creator' => array(
+      'arguments' => array('creator' => null),
+    ),
+      'game_duration' => array(
+      'arguments' => array('duration' => null,'icono'=> null),
+    ),
+      'game_winner' => array(
+      'arguments' => array('winner' => null),
+    ),
+     'game_map' => array(
+      'arguments' => array('map' => null,'icono'=>TRUE),
+    ),
+    'gamename' => array(
+      'arguments' => array('gamename' => null,'id'=> null),
+    ),
+    'lastgame' => array(
+      'arguments' => array('lastgame' => null),
+    ),
+    'game_time' => array(
+      'arguments' => array('min' => null,'sec' => null),
+    ),
+    'game_details' => array(
+      'arguments' => array(
+      'game' => null
+      ),
+    ),
+  );
+}
+function theme_game_details($game){
+  $output = '';
+  $output .= '<div class="game-details">';
+  $output .= '  <ul>';
+  $output .= '<li>' . theme('game_datetime',$game['datetime']) . '</li>';
+  $output .= '<li>' . theme('game_creator',$game['ownername']) . '</li>';
+  $output .= '<li>' . theme('game_duration',$game['duration']) . '</li>';
+  $output .= '<li>' . theme('game_winner',$game['winner'],'long') . '</li>';
+  $output .= '</ul>';
+
+  $output .= '</div>';
+  return $output;
+}
+function theme_lastgame($lastgame){
+
+  return theme('game_details',$lastgame);
+}
+function dgstats_games_page(){
+  $output = '';
+  $headers = _dgstats_get_table_header('games');
+  $order = _dgstats_get_order_str('games');
+  $games = dgstats_get_games($order);
+//  dpm($games);
+  $formated_games = dgstats_format_table($headers,$games);
+  //$formated_games = dgstats_format_games($games);
+  $output .= theme('table',$headers,$formated_games);
+  $output .= theme('pager');
+  return $output;
+}
+//function dgstats_format_games($games){
+// // dpm($games);
+//  $formated_games = array();
+//  foreach($games as $game){
+//    $row  = array();
+//    $row[] = theme('gamename',$game['gamename'], $game['gameid']);
+//
+//    $row[] = theme('game_map',$game['map'],FALSE);
+//    $row[] = $game['min'] . ':' . $game['sec'];
+//    $row[] = theme('icono','winner-' . $game['winner']);
+//    $row[] = $game['datetime'];
+//    $row[] = theme('playername', $game['ownername']);
+//
+//    $formated_games[] = $row;
+//  }
+//  return $formated_games;
+//}
+function dgstats_format_lastgame($lastgame){
+  $formated = array();
+
+  $formated['gamename'] = theme('gamename',$lastgame['gamename'],$lastgame['id']);
+  $formated['datetime'] = theme('game_datetime',$lastgame['datetime']);
+  $formated['winner'] = $lastgame['winner'];
+  $formated['duration'] = theme('game_duration',$lastgame['min'] . ':' . $lastgame['sec']);
+
+  return $formated;
+}
+function dgstats_get_games($order){
+  $games_raw = array();
+  $games = array();
+
+  $sql = 'SELECT g.id FROM {games} g INNER JOIN {dotagames} d WHERE g.id = d.gameid ';
+
+//   $sql = 'SELECT g.id,gamename,ownername,datetime,winner,min,sec,map FROM {games} g INNER JOIN {dotagames} d WHERE g.id = d.gameid ';
+  $order_str = _dgstats_get_order_str('games');
+  $sql .= $order_str;
+
+  $result = pager_query($sql,20,0);
+  while($game = db_result($result)){
+  /*  $game['gamename'] = l($row['gamename'],'stats/games/' . $row['gameid']);
+    $game['map'] = str_replace('Maps\\Download\\', '',$row['map']);
+    $game['map'] = str_replace('.w3x','',$game['map']);
+    $game['duration'] = $row['min'] . ':' . $row['sec'];
+    $game['winner'] = $row['winner'];
+    $game['datetime'] = $row['datetime'];
+    $game['ownername'] = $row['ownername'];
+*/
+    $games[] = game_load($game);
+  }
+  //foreach($games_raw as $game_raw){
+    //$games[]
+  //}
+
+  return $games;
+}
+
+function dgstats_game_dgstats_server(){
+  $serverstats = array();
+  $serverstats['games'] = array(
+    'label' => 'Total games',
+    'data' => _dgstats_get_total_games()
+  );
+  return $serverstats;
+}
+
+function dgstats_get_last_game(){
+  $lastgame_id = _dgstats_get_last_game_id();
+  $lastgame = game_load($lastgame_id);
+
+  return $lastgame;
+}
+function _dgstats_get_last_game_id(){
+  $sql =" SELECT id FROM {games}  WHERE  duration > 200 ORDER BY Datetime DESC";
+ $result = db_query($sql) ;
+ $lastgameid = db_fetch_array($result);
+ return $lastgameid['id'];
+}
+
+function _dgstats_get_total_games(){
+  $sql = "select count(*) as numgames from games";
+
+  $result = db_query($sql);
+  $row = db_fetch_array($result);
+  $games = $row['numgames'];
+  return $games;
+}
+function dgstats_get_player_games_deprecated($player){
+  $games = array();
+
+  $playername =  $player->playername;
+
+//  $query = "select * from {dgstats_player_evolution}"
+
+  $order_str = _dgstats_get_order_str('player_games');
+  $sql .= $order_str;
+}
+function dgstats_get_player_games($player){
+  $games = array();
+  if(is_object($player))
+    $player = (array) $player;
+  $playername =  $player['playername'];
+
+  $sql = "SELECT winner,
+   a.gameid as id,
+   newcolour,
+   datetime,
+   gamename,
+   hero,
+   team,
+   kills,
+   deaths,
+   assists,
+   creepkills, creepdenies, neutralkills,towerkills
+   name,
+   d.duration,
+   CASE when(gamestate = '17') then 'PRIV' else 'PUB' end as type,
+   CASE WHEN (deaths = 0 and kills = 0) THEN 0 WHEN (deaths = 0) then 1000 ELSE (kills*1.0/deaths) end as kdratio,
+   CASE when (winner=1 and newcolour < 6) or (winner=2 and newcolour > 5) then 'WON' when  winner=0 then 'DRAW' else 'LOST' end as result
+
+  FROM dotaplayers AS a LEFT JOIN gameplayers AS b ON b.gameid = a.gameid and a.colour = b.colour
+  LEFT JOIN dotagames AS c ON c.gameid = a.gameid
+  LEFT JOIN games AS d ON d.id = a.gameid where name= '$playername'";
+
+  $order_str = _dgstats_get_order_str('player_games');
+  $sql .= $order_str;
+
+  $result = pager_query($sql);
+  while($row = db_fetch_array($result)){
+    $games[] = $row;
+  }
+
+  return $games;
+}
+function dgstats_game_dgstats_player_load($player){
+  return array('played_games' =>dgstats_get_player_games($player) );
+}
+function dgstats_game_dgstatsplayer($op,$player){
+  switch($op){
+    case 'load':
+      return array('played_games' =>dgstats_get_player_games($player) );
+    case 'view':
+      $header_games = _dgstats_get_table_header('player_games');
+      $formated_games = dgstats_format_table($header_games,$player['played_games']);
+      return array(
+        'games' => array(
+          '#title' => 'Games',
+          '#output' => theme('table',$header_games,$formated_games),
+          '#weight' => 3,
+        ),
+        'games_pager' => array(
+          '#output' => theme('pager'),
+          '#weight' => 4,
+        ),
+      );
+
+  }
+
+}
+//function dgstats_game_dgstatsconfig($op){
+//  switch($op){
+//    case 'form':
+//      $form = array();
+//
+//      $form['gameconfig'] = array(
+//        '#type' => 'fieldset',
+//        '#title' => t('Game config'),
+//        '#weight' => 0,
+//        '#collapsible' => TRUE,
+//        '#collapsed' => FALSE,
+//      );
+//      $form['gameconfig']['listmingames'] = array(
+//        '#type' => 'textfield',
+//        '#title' => 'Minimum games',
+//        '#default_value' => variable_get('dgstats_config_listmingames',4),
+//      );
+//
+//
+//      return $form;
+//    case 'validate':
+//      return array('dgstats_game_botconfig_validate');
+//      break;
+//    case 'submit':
+//      return array('dgstats_game_botconfig_submit');
+//      break;
+//
+//  }
+//}
+//function dgstats_game_botconfig_validate(){
+//  dpm('validando gameconfig');
+//}
+//function dgstats_game_botconfig_submit(){
+//
+//}
+function dgstats_game_node_info() {
+  return array(
+    'dgstats_game' => array(
+      'name' => t('Game'),
+      'module' => 'dgstats_game',
+      'description' => t("Ghost Stats Game."),
+      'has_title' => false,
+      'title_label' => t('Gamename') . ':',
+      'has_body' => FALSE,
+//      'body_label' => t('Example Body'),
+    )
+  );
+}
+function dgstats_game_form(&$node, $form_state) {
+  $form = array();
+  
+  return $form;
+}
+/**
+ * Implementation of hook_insert().
+ *
+ * As a new node is being inserted into the database, we need to do our own
+ * database inserts.
+ */
+function dgstats_game_insert($node) {
+//  print_r($node);
+//print '##insert bef##';
+drupal_write_record('dgstats_game',$node);
+//print '##insert af##';
+//print_r($node);
+//  $sql = "INSERT INTO {dgstats_game} (gameid"
+}
+
+/**
+ * Implementation of hook_update().
+ *
+ * As an existing node is being updated in the database, we need to do our own
+ * database updates.
+ */
+function dgstats_game_update($node) {
+//  dpm(array('update',array($node)));
+  // if this is a new node or we're adding a new revision,
+//  print_r($node);
+  drupal_write_record('dgstats_game',$node,array('nid','gameid'));
+
+//    db_query("UPDATE {node_example} SET color = '%s', quantity = %d WHERE vid = %d", $node->color, $node->quantity, $node->vid);
+
+}
+
+function dgstats_game_delete($node) {
+    db_query('DELETE FROM {dgstats_game} where nid = %s',$node->nid);
+}
+function dgstats_game_load($node) {
+  $additions = db_fetch_object(db_query('SELECT * FROM {dgstats_game} WHERE nid = %d', $node->nid));
+  return $additions;
+}
+function _dgstats_game_get_game_nid($gameid){
+  $nid = db_result(db_query("SELECT nid from {dgstats_game} where gameid = %s",$gameid));
+  if(!$nid)
+    return false;
+  return $nid;
+}
+function dgstats_game_create_base_node($gameid){
+//  print "gameid:#$gameid#";
+    //Verify if exists a node for this gameid
+    $nid =_dgstats_game_get_game_nid($gameid);
+//    print "nid:#$nid#";
+    if($nid){
+      //just set to non processed
+      db_query('UPDATE {dgstats_game} SET gamestatus = %s where gameid = %s',DGSTATS_GAME_STATUS_NON_PROCESSED,$gameid);
+    } else {
+      //create new node
+      module_load_include('pages.inc', 'node');
+      $node = new StdClass();
+      $node->type = 'dgstats_game';
+      node_object_prepare($node);
+      $node->gameid = $gameid;
+      $node->gamestatus = DGSTATS_GAME_STATUS_NON_PROCESSED;
+      $node->datetime = db_result(db_query("SELECT datetime from {games} where id = %s",$gameid));
+      node_save($node);
+      $nid = $node->nid;
+    }
+    
+    return $nid;
+}
+function dgstats_game_process_games_batch($all = 0){
+  if($all == 1){
+    db_query("UPDATE {games} SET dgstats_status = 0");
+    module_invoke_all('dgstats_process_all_games');
+  }
+  $operations = array();
+  $non_processed = dgstats_game_get_non_processed_gameids();
+  $total_games_to_process = 0;
+  foreach($non_processed as $gameid){
+      $nid = dgstats_game_create_base_node($gameid);
+      $operations[] = array('dgstats_game_process_games_batch_op',array($nid));
+      $total_games_to_process++;
+  }
+  $batch = array(
+    'operations' => $operations,
+    'finished' => 'dgstats_game_process_games_batch_finished',
+    // We can define custom messages instead of the default ones.
+    'title' => t('Processing @count games',array('@count'=> $total_games_to_process)),
+    'init_message' => t('Game proccesing is starting.'),
+//    'progress_message' => t('Processed @current out of @total.'),
+    'progress_message' => t('Current: @current
+      | Remaining: @remaining
+      | Total: @total
+      | Percentage: @percentage'
+
+            ),
+    'error_message' => t('Game processing has encountered an error.'),
+//     'progress_message' => t('Current: @current | Remaining:
+//        @remaining | Estimate:
+//        @estimate | Elapsed: @elapsed'),
+    'error_message' => t('Game processing has encountered an error.'),
+
+  );
+  return $batch;
+}
+
+function dgstats_game_get_non_processed_gameids(){
+  $non_processed = array();
+  $sql = 'SELECT id FROM {games} where dgstats_status = 0';
+  $result = db_query($sql);
+  while($gameid = db_result($result)){
+    $non_processed[] = $gameid;
+  }
+
+  return $non_processed;
+}
+function dgstats_game_process_games_batch_op($nid, &$context){
+    if (empty($context['sandbox'])) {
+      $context['sandbox'] = array();
+      $context['sandbox']['progress'] = 0;
+      $context['sandbox']['current_game'] = $nid ;
+
+      // Save node count for the termination message.
+      $context['sandbox']['max'] = 1;
+    }
+//    $node = node_load($nid);
+    dgstats_game_process_game($nid);
+    $_SESSION['dgstats_games_processed']++;
+
+    $context['message'] = check_plain($node->gamename);
+    $context['results'][] = $node->gamename;
+
+    //Set status to processing
+
+}
+
+function dgstats_game_process_game($nid){
+  
+  $node = node_load($nid);
+  $gameid = $node->gameid;
+
+  db_query("UPDATE {games} SET dgstats_status = %d WHERE id = %d",DGSTATS_GAME_STATUS_PROCESSING,$gameid);
+
+  $sql = "SELECT g.id as gameid,
+            g.botid as botid,
+            server,
+            map,
+            datetime,
+            gamename,
+            ownername as owner,
+            duration,
+            gamestate,
+            creatorname as creator,
+            winner,
+            dgstats_status as gamestatus
+            from {games} g JOIN {dotagames} dg ON g.id = dg.gameid WHERE g.id = %s";
+  $result = db_query($sql,$gameid);
+  $game = db_fetch_object($result);
+
+  drupal_alter('dgstats_game_process',$game);
+
+  //Add each field to the node object
+
+  foreach($game as $key => $val){
+    $node->$key = $val;
+  }
+//  print_r($game);
+  $node->gamestatus = DGSTATS_GAME_STATUS_PROCESSED;
+  module_invoke_all('dgstats_game_process',$node);
+  node_save($node);
+  db_query("UPDATE {games} SET dgstats_status = %d WHERE id = %d",DGSTATS_GAME_STATUS_PROCESSED,$gameid);
+  
+
+  return $node;
+}
+
+function dgstats_game_process_games_form(&$form_state){
+//  dpm($form);
+
+
+
+  $page_description = t('Click "@begin" button to start proccess.',array('@begin'=>t('Begin')));
+  if(!isset($form_state['storage']['step'])){
+    $form_state['storage']['step'] = 1;
+
+  }
+  $step = $form_state['storage']['step'];
+  if($step == 1) {
+    $form['info'] = array(
+      '#value' => $page_description,
+    );
+    $form['all'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Process all games'),
+      '#default_value' => (isset($form_state['values']['all'])) ? $form_state['values']['all'] : 0,
+    );
+     $form['submit'] = array(
+       '#type' => 'submit',
+       '#value' => t('Begin'),
+     );
+  } else if($step == 2){
+    if($form_state['values']['all'] == 1){
+      $text = t('Are you sure that you want to process ALL the games?');
+    } else {
+      $text = t('Are you sure that you want to process remaining the games?');
+    }
+    $form = confirm_form($form, $text, 'admin/config/dgstats/game/process-games', t('This action cannot be undone.'));
+  }
+   return $form;
+}
+
+function dgstats_game_process_games_form_submit($form,&$form_state){
+//  dpm($form_state);
+  $step = $form_state['storage']['step'];
+  if($step == 1){
+    $form_state['storage']['all'] = $form_state['values']['all'];
+    $form_state['storage']['step'] = 2;
+    $form_state['rebuild'] = true;
+  } else if ($step == 2){
+    $can_process = !variable_get('dgstats_game_processing',true);
+
+    if($can_process){
+      $batch = dgstats_game_process_games_batch($form_state['storage']['all']);
+
+      $_SESSION['dgstats_games_processed'] = 0; // reset counter for debug information.
+      batch_set($batch);
+    } else {
+      drupal_set_message(t('The game processing is already running.'));
+    }
+    unset($form_state['storage']);
+  }
+
+
+}
+
+/**
+ * Batch 'finished' callback used by game processing batch.
+ */
+function dgstats_game_process_games_batch_finished($success, $results, $operations) {
+  if ($success) {
+    // Here we could do something meaningful with the results.
+    // We just display the number of nodes we processed...
+    drupal_set_message(t('@count results processed in @games games.', array('@count' => count($results), '@games' => count($operations))));
+    drupal_set_message(t('The final result was "%final"', array('%final' => end($results))));
+  }
+  else {
+    // An error occurred.
+    // $operations contains the operations that remained unprocessed.
+    $error_operation = reset($operations);
+    drupal_set_message(t('An error occurred while processing @operation with arguments : @args', array('@operation' => $error_operation[0], '@args' => print_r($error_operation[0], TRUE))));
+  }
+  variable_set('dgstats_game_processing',FALSE);
+}
+
+
+function dgstats_game_init(){
+    $sql  = "select id from {games} where dgstats_status = 0";
+    $result = db_query($sql);
+    $gameids = array();
+    while($id = db_result($result)){
+      $gameids[] = $id;
+//      dpm($id);
+//      dgstats_game_create_base_node($id);
+    }
+//    dpm($gameids);
+    foreach($gameids as $gameid){
+      dgstats_game_create_base_node($gameid);
+    }
+    //Process just one game
+    dgstats_game_process_one_game();
+
+
+}
+function dgstats_game_process_one_game(){
+  $sql = "select nid from {dgstats_game} where gamestatus = 0 LIMIT 1";
+  $nid = db_result(db_query($sql));
+//  dpm($nid);
+  if($nid){
+    dgstats_game_process_game($nid);
+  }
+  
+}
+/**
+ * page callback
+ */
+function dgstats_game_process_games_external(){
+  $sql  = "select id from {games} where dgstats_status = 0";
+    $result = db_query($sql);
+    $gameids = array();
+    while($id = db_result($result)){
+      $gameids[] = $id;
+//      dpm($id);
+//      dgstats_game_create_base_node($id);
+    }
+//    dpm($gameids);
+    foreach($gameids as $gameid){
+      dgstats_game_create_base_node($id);
+    }
+}
+/**
+ * use with caution can cause memory problems.
+ */
+function dgstats_game_process_remaining_games(){
+  $limit = 10; //just in case cron or script not run
+
+  $sql = "select nid from {dgstats_game} where gamestatus = 0 LIMIT $limit";
+  while($nid = db_result(db_query($sql))){
+    $nids[] = $nid;
+  }
+  foreach($nids as $nid){
+    dgstats_game_process_game($nid);
+  }
+  print count($nids);
+  exit();
+}
+

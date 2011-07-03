@@ -1,0 +1,19 @@
+Version 0.2
+-Added player evolution feature.
+-Realtime notifications. ghostone + path required.
+-Some new features
+-Several bug fixes.
+
+
+Version 0.1.3
+-Fixed ban search block redirection to correct page.
+-Fixed player search block redirection to correct page.
+-Added autocomplete functionality to player search block.
+-Added autocomplete functionality to ban search block.
+
+Version 0.1.2 12-09-2009
+-Critical bug fix in player page.
+
+
+Version 0.1: 09-2009
+-Initial release.

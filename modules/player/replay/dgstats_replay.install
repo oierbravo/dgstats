@@ -1,0 +1,46 @@
+<?php
+function dgstats_replay_install() {
+  drupal_install_schema('dgstats_replay');
+}
+
+
+/**
+ * Implementation of hook_unistall()
+ */
+function dgstats_replay_unistall() {
+  drupal_uninstall_schema('dgstats_replay');
+}
+function dgstats_replay_schema(){
+
+  $schema = array();
+
+  $schema['replay_dowload_statistics'] = array(
+    'fields' => array(
+      'rdid' => array('type' => 'serial','unsigned' => TRUE,'not null' => TRUE),
+      'gameid'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE),
+      'uid'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE),
+      'timestamp'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE),
+    ),
+    'primary key' => array('rdid'),
+
+  );
+
+//  $schema['node'] = array(
+//    'fields' => array(
+//    'nid'      => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+//    'vid'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+//    'type'     => array('type' => 'varchar', 'length' => 32, 'not null' => TRUE, 'default' => ''),
+//    'title'    => array('type' => 'varchar', 'length' => 128, 'not null' => TRUE, 'default' => ''),
+//    ),
+//    'primary key' => array('nid'),
+//    'unique keys' => array(
+//    'vid'     => array('vid')
+//    ),
+//    'indexes' => array(
+//    'nid'                 => array('nid'),
+//    'node_title_type'     => array('title', array('type', 4)),
+//    ),
+//  );
+
+  return $schema;
+}

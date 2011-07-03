@@ -1,0 +1,79 @@
+<?php
+/**
+ *  Project: Drupal Ghost Stats
+ *
+ *  Copyright (C) 2009 Oier Bravo Urtasun
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Affero General Public License as
+ *    published by the Free Software Foundation, either version 3 of the
+ *    License, or (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/**
+ * Implementation of hook_install() 
+ */
+//function dgstats_install() {
+//
+//}
+
+
+
+
+/**
+ * Implementation of hook_unistall() 
+ */
+//function dgstats_unistall() {
+//
+//}
+function dgstats_schema(){
+  //CREATE TABLE bans (
+//	id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+//	botid INT NOT NULL,
+//	server VARCHAR(100) NOT NULL,
+//	name VARCHAR(15) NOT NULL,
+//	ip VARCHAR(15) NOT NULL,
+//	date DATETIME NOT NULL,
+//	gamename VARCHAR(31) NOT NULL,
+//	admin VARCHAR(15) NOT NULL,
+//	reason VARCHAR(255) NOT NULL
+//);
+  $schema = array();
+  $schema['bans'] = array(
+
+  );
+  $schema['admins'] = array(
+    'fields' => array(
+      'id'      => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+      'botid'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'name'     => array('type' => 'varchar', 'length' => 15, 'not null' => TRUE, 'default' => ''),
+      'server'     => array('type' => 'varchar', 'length' => 100, 'not null' => TRUE, 'default' => ''),
+    ),
+  );
+
+//  $schema['node'] = array(
+//    'fields' => array(
+//    'nid'      => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+//    'vid'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+//    'type'     => array('type' => 'varchar', 'length' => 32, 'not null' => TRUE, 'default' => ''),
+//    'title'    => array('type' => 'varchar', 'length' => 128, 'not null' => TRUE, 'default' => ''),
+//    ),
+//    'primary key' => array('nid'),
+//    'unique keys' => array(
+//    'vid'     => array('vid')
+//    ),
+//    'indexes' => array(
+//    'nid'                 => array('nid'),
+//    'node_title_type'     => array('title', array('type', 4)),
+//    ),
+//  );
+
+  return $schema;
+}

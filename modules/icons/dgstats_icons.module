@@ -1,0 +1,189 @@
+<?php
+/**
+ *  Project: Drupal Ghost Stats
+ *
+ *  Copyright (C) 2009 Oier Bravo Urtasun
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Affero General Public License as
+ *    published by the Free Software Foundation, either version 3 of the
+ *    License, or (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+function dgstats_icons_theme(){
+  return array(
+    'icono' => array(
+      'arguments' => array('key' => null),
+    ),
+     'dotaitem' => array(
+      'arguments' => array('item' => null),
+    ),
+     'dotaitems_group' => array(
+      'arguments' => array('items' => null),
+    ),
+     'hero' => array(
+      'arguments' => array('hero' => null,'clickable' => true,'getsize' => false,'width' => 32, 'height' => 32,'align' => null),
+    ),
+  );
+}
+function dgstats_icons_init(){
+  global $dota;
+  include_once drupal_get_path('module','dgstats_icons') . '/dota/dota-items.php';
+  include_once drupal_get_path('module','dgstats_icons') . '/dota/dota-heroes.php';
+ 
+}
+function theme_icono($key){
+  $output = '';
+//dpm($key);
+  $icono = dgstats_get_iconos($key);
+//dpm($icono);
+  if($icono){
+    if(isset($icono['module'])){
+        $module = $icono['module'];
+
+    } else {
+        $module = 'dgstats_icons';
+    }
+    $src = drupal_get_path('module',$module) .  '/' . $icono['src'];
+//    $src .=  $icono['src'];
+    $output = theme('image',$src,$icono['title'],$icono['title']);
+  }
+  return $output;
+}
+function dgstats_get_iconos($key = null){
+  $iconos = array();
+//dpm($key);
+  $iconos = module_invoke_all('iconos');
+  $iconos['team-0'] = array(
+    'title' => 'Sentinel',
+    'src' => 'images/nuovola/32/ledorange.png',
+  );
+  $iconos['team-1'] = array(
+    'title' => 'Scourge',
+    'src' => 'images/nuovola/32/ledpurple.png',
+  );
+   $iconos['result-0'] = array(
+    'title' => 'Draw',
+    //'src' => 'smiley_norm.png',
+    'src' => 'images/nuovola/32/cancel.png',
+
+  );
+  $iconos['result-1'] = array(
+    'title' => 'Won',
+    'src' => 'images/tango/32/face-smile.png',
+    // 'src' => 'smiley.png',
+  );
+  $iconos['result-2'] = array(
+    'title' => 'Lost',
+    //'src' => 'smiley_sad_red.png',
+    'src' => 'images/tango/32/face-crying.png',
+  );
+  $iconos['winner-0'] = array(
+    'title' => 'Draw',
+    'src' => 'images/nuovola/32/cancel.png',
+  );
+  $iconos['winner-1'] = array(
+    'title' => 'Sentinel',
+    'src' => 'images/nuovola/32/ledorange.png',
+  );
+  $iconos['winner-2'] = array(
+    'title' => 'Scourge',
+    'src' => 'images/nuovola/32/ledpurple.png',
+  );
+  $iconos['time'] = array(
+    'title' => 'Time',
+    'src' => 'images/crystal/24/kalarm.png',
+  );
+ $iconos['calendar'] = array(
+    'title' => 'Date',
+    'src' => 'images/crystal/24/date.png',
+  );
+  $iconos['admin'] = array(
+    'title' => 'Admin',
+    'src' => 'images/crystal/24/password.png',
+  );
+
+  drupal_alter('iconos',$iconos);
+
+  if($key != null){
+    if(isset($iconos[$key])){
+      return $iconos[$key];
+
+    } else {
+      return FALSE;
+    }
+  } else {
+    return $iconos;
+  }
+}
+
+function theme_dotaitem($item_key){
+  $output = '';
+  global $dota;
+
+  $item_key = strtolower($item_key);
+  $item = $dota['items'][$item_key];
+ 
+  $img_src = drupal_get_path('module','dgstats_icons') . '/dota/items/' . $item['art'];
+
+  if(empty($item) || $item=="\0\0\0\0"){
+    $img_src = drupal_get_path('module','dgstats') . '/images/items/empty.gif';
+  }
+  
+  
+  $output .= theme('image',$img_src, $alt = $item['name'], $title = $item['name'],array('width' => 24,'height' => 24),false);
+  //$output .= $item;
+  return $output;
+}
+function theme_dotaitems_group($items){
+
+  //Check if arg is 1 array or 6 strings
+  if(!is_array($items)){
+    $items = func_get_args();
+    //dpm($items);
+  }
+  $output = '';
+  foreach($items as $item){
+   // $output .= '<div class="item">';
+    $output .= theme('dotaitem',$item);
+   // $output .= '</div>';
+  }
+  
+  return $output;
+}
+function theme_hero($hero_key,$clickable = true,$getsize = false,$width = 32,$height = 32,$align = null){
+  $output = '';
+  global $dota;
+  $hero_key = strtolower($hero_key);
+  $hero = $dota['heroes'][$hero_key];
+  if($hero['is_duplicate']){
+    $orig_id = $hero['original_id'];
+    $hero_key = $orig_id;
+    $hero = $hero = $dota['heroes'][$orig_id];
+  }
+  $img_src = drupal_get_path('module','dgstats_icons') . '/dota/heroes/' . $hero['art'];
+  if($getsize){
+    $attribs = array();
+  } else {
+    $attribs = array('width' => $width,'height' => $height);
+  }
+  if(!is_null($align)){
+    $attribs['align'] = $align;
+  }
+  $image = theme('image',$img_src, $hero['name'],$hero['name'],$attribs,$getsize);
+ if($clickable){
+   $hero_url = DGSTATS_PAGE_HEROS . '/' . $hero_key;
+   $output .= l($image,$hero_url,array('html'=>true));
+ } else {
+  $output .= $image;
+ }
+ //  $output .= $hero;
+  return $output;
+}

@@ -1,0 +1,553 @@
+<?php
+/**
+ *  Drupal Ghost Stats: Charts module
+ *
+ *  This modules contains most chart related task.
+ *  This module its optional
+ *
+ *  Copyright (C) 2009 Oier Bravo Urtasun
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Affero General Public License as
+ *    published by the Free Software Foundation, either version 3 of the
+ *    License, or (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+function dgstats_charts_menu(){
+  $items['test-charts'] = array(
+    'title' => 'Test Charts',
+    'page callback' => 'dgstats_charts_test_page',
+    'access arguments' => array('access ghost stats'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['js/charts'] = array(
+    'title' => 'Charts series',
+    'page callback' => 'dgstats_charts_series_page_js',
+    'access arguments' => array('access ghost stats'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+function dgstats_charts_clan_points(){
+  $players = array('KaiZO','eneko','cuajadas','EPEH','yekcoH','C13');
+  $colors = array('000000','fff000','00ffff','ff00ff','ffff00','ff0000');
+  $data = array();
+
+  $chart = ofc_api_chart();
+  $max_count = 60;
+  $i = 0;
+  $player_count = count($players);
+  for($i =0;$i <$player_count;$i++){
+
+    $player = $players[$i];
+    $games_history = dgstats_get_player_history($player);
+    $evolution = array_reverse(dgstats_player_get_evolution($games_history));
+    $points = array();
+    $line = ofc_api_element('line');
+    $chartpoints = array();
+    foreach($evolution as $point){
+      $points[] = $point['points'];
+      //$points[] = $point['datetime'];
+      $chartpoint = array(
+        'tooltip' =>  'date',
+        'value' => $point['points'],
+      );
+      $chartpoints[] = $chartpoint;
+      //$line->add('value', $chartpoint);
+
+    }
+
+    $line = ofc_api_element('line');
+    $line->set('values', $points);
+    $line->set('width', 2);
+    $line->set('colour', '#' . $colors[$i]);
+    $line->set('text', $player);
+
+    $dot = ofc_api_element('solid-dot');
+    $dot->set('dot-size', 3);
+    $dot->set('halo-size', 1);
+    $dot->set('colour', '#' . $colors[$i]);
+
+    $line->set('dot-style', $dot);
+
+    $chart->add('element', $line);
+
+  }
+  $y_axis = ofc_api_element();
+  $y_axis->set('min', -2);
+  $y_axis->set('max', 10);
+  $y_axis->set('steps', 0.5);
+
+  $x_axis = ofc_api_element();
+  $x_axis->set('min', 1);
+  $x_axis->set('max', $max_count);
+  //$x_axis->set('min', mktime(0, 0, 0, 1, 1, date('Y')));
+  //$x_axis->set('max', mktime(0, 0, 0, 1, 31, date('Y')));
+  $x_axis->set('steps', 1);
+
+  $chart->set('x_axis' , $x_axis);
+  $chart->set('y_axis' , $y_axis);
+
+ 
+
+return $chart;
+}
+
+//function dgstats_charts_clan_points(){
+//  $players = array('KaiZO','eneko','cuajadas','EPEH','yekcoH','C13');
+//  $colors = array('000000','ffffff','00ffff','ff00ff','ffff00','ff0000');
+//  $data = array();
+//
+//  $chart = new open_flash_chart();
+////$chart->set_title( new title( 'Test Chart ' ) );
+//
+//$max_count = 20;
+//$i = 0;
+//$player_count = count($players);
+//  for($i =0;$i <$player_count;$i++){
+//
+//
+//
+//    $player = $players[$i];
+//    $games_history = dgstats_get_player_history($player);
+//    $evolution = dgstats_player_get_evolution($games_history);
+//    $points = array();
+//    $line = new line();
+//    $chartpoints = array();
+//    $def = new solid_dot();
+//    $def->size(3)->halo_size(2)->tooltip('#date:d M y#<br>Value: #val#');
+//    foreach($evolution as $point){
+//      $points[] = $point['points'];
+//      //$points[] = $point['datetime'];
+//      $chartpoint = array(
+//        'tooltip' =>  'date',
+//        'value' => $point['points'],
+//      );
+//      $chartpoints[] = $chartpoint;
+//      //$line->add('value', $chartpoint);
+//
+//
+//    }
+//
+//      $line->set_values( $points );
+//      $line->set_default_dot_style( $def );
+////    $line = ofc_api_element('line');
+////  $line->set('values', $chartpoints);
+////  $line->set('width', 2);
+////  $line->set('colour', '#' . $colors[$i]);
+////  $line->set('text', $player);
+////
+////  $dot = ofc_api_element('solid-dot');
+////  $dot->set('dot-size', 3);
+////  $dot->set('halo-size', 1);
+////  $dot->set('colour', '#' . $colors[$i]);
+////
+////  $line->set('dot-style', $dot);
+//
+//   $chart->add_element( $line );
+//
+//  }
+////$y_axis = ofc_api_element();
+//// $y_axis->set('min', -2);
+////  $y_axis->set('max', 10);
+////  $y_axis->set('steps', 0.5);
+////
+////  $x_axis = ofc_api_element();
+//// $x_axis->set('min', 1);
+////  $x_axis->set('max', 20);
+////  $x_axis->set('steps', 1);
+//
+//$labels = new x_axis_labels();
+//// tell the labels to render the number as a date:
+//$labels->text('#date:l jS, M Y#');
+//// generate labels for every day
+//$labels->set_steps(86400);
+//// only display every other label (every other day)
+//$labels->visible_steps(2);
+//$labels->rotate(90);
+//
+//$x->set_labels($labels);
+//$chart->set_x_axis( $x );
+//$y = new y_axis();
+//$y->set_range( 0, 15, 5 );
+//$chart->set_y_axis( $y );
+////  $chart->set('x_axis' , $x_axis);
+////  $chart->set('y_axis' , $y_axis);
+//
+//return $chart;
+//}
+function dgstats_charts_ofc_api_data() {
+  return array('dgstats_charts_clan_points');
+}
+
+  
+
+//  $y_axis = ofc_api_element();
+//  $y_axis->set('min', 0);
+//  $y_axis->set('max', 8);
+//  $y_axis->set('steps', 4);
+//
+//  $title = array(
+//    'text' => date("D M d Y"),
+//  );
+
+
+
+
+//  $chart->set('title', $title);
+ // $chart->set('y_axis' , $y_axis);
+
+
+
+//media de partidas por dia d la semana
+//select DAYNAME(aa.dt),avg(aa.numgames) fr/om (select datetime as dt, count(id) as numgames from games group by DAYOFYEAR(datetime))as aa group by dayname(aa.dt)
+
+function dgstats_charts_player_evolution($arguments = array()){
+  if(empty($arguments)){
+    return false;
+  }
+//  dpm($arguments);
+  $playername = $arguments['playername'];
+  $cols = explode(',', $arguments['cols'] );
+  foreach($cols as $col){
+    $cols_str = ',avg(' . $col .') as ' . $col;
+  }
+  $time_query = " AND dayofyear(datetime) < dayofyear(now()) ";
+  $query = "select DAYOFYEAR(datetime) as day $cols_str from {dgstats_player_evolution} where playername  = '%s' $time_query  GROUP BY DAYOFYEAR(datetime)";
+  $today = date('z') +1;
+  $result = db_query($query,$playername);
+  while($row = db_fetch_object($result)){
+    $rows[$row->day] = $row;
+  }
+  $year = 366;
+  
+  $data = array();
+
+  foreach($cols as $col){
+    $last_data = 0;
+    for($i = 1; $i < $today;$i++){
+    
+      if(isset($rows[$i])){
+          $data[$col][] = floatval($rows[$i]->$col);
+          $last_data = floatval($rows[$i]->$col);
+      } else {
+        $data[$col][] = $last_data;
+      }
+
+    }
+
+
+
+  }
+
+  return $data;
+  
+
+}
+function dgstats_charts_player_evolution_form(){
+  $form = array();
+  return $form;
+}
+function dgstats_charts_add_highcharts(){
+  drupal_add_js(drupal_get_path('module', 'dgstats_charts') . '/highcharts/highcharts.src.js');
+}
+function dgstats_charts_get_chart_info($key){
+  $charts = module_invoke_all('dgstats_charts');
+  if(isset($charts[$key])){
+    $chart_info = $charts[$key];
+
+    drupal_alter('dgstats_chart',$chart_info);
+
+    return $chart_info;
+  } else {
+    return false;
+  }
+}
+function dgstats_charts_get_chart($key,$arguments){
+  $charts = module_invoke_all('dgstats_charts');
+  if(isset($charts[$key])){
+    $chart_info = $charts[$key];
+    $func = $chart_info['callback'];
+
+    $data = $func($arguments);
+
+    $chart = array(
+      'key' => $key,
+      'data' => $data,
+    );
+
+    drupal_alter('dgstats_chart',$chart);
+
+    return $chart;
+  } else {
+    return false;
+  }
+}
+function dgstats_charts_get_chart_data($key,$arguments){
+  $chart = dgstats_charts_get_chart_info($key);
+
+  $func = $chart['callback'];
+  if(function_exists($func)){
+    $data = $func($arguments);
+    return $data;
+  } else
+    return false;
+}
+function dgstats_charts_dgstats_charts(){
+  $charts_info = array();
+  $charts_info['player_evolution'] = array(
+    'callback' => 'dgstats_charts_player_evolution',
+    'js' => 'player-evolution',
+    'module' => 'dgstats_charts',
+    'path' => '/charts',
+    'arguments' => array('playername','cols'),
+  );
+ 
+
+  return $charts_info;
+
+}
+
+function dgstats_charts_render_chart($key){
+
+
+  dgstats_charts_add_highcharts();
+//  $js = 'Drupal.behaviors.dgstatsChart = function(){';
+////$js .= 'alert(Date.UTC(2010, 0, 01));';
+//  $js .= 'var options = ' . $chart->toJS() . ';';
+//  $js .= 'chart = new Highcharts.Chart(options);';
+//  $js .= '}';
+//
+//  drupal_add_js($js,'inline');
+  $chart_info = dgstats_charts_get_chart_info($key);
+  
+  $js_file = drupal_get_path('module',$chart_info['module']) . $chart_info['path'] . '/' . $chart_info['js'] . '.js';
+
+    drupal_add_js($js_file);
+}
+
+function dgstats_charts_test_page(){
+//  dgstats_charts_add_highcharts();
+  $output = '';
+  $output .= '<div id="dgstats-charts-wrapper"></div>';
+//   $args = array('playername' => 'KaiZO','cols' => array('points'));
+//  $data = dgstats_charts_player_evolution($args);
+//$chart = new DgstatsChart('Prueba chart');
+////$chart->xAxis = new stdClass();
+////$chart->xAxis->prueba = 9999;
+//$chart->chart->zoomType = 'x';
+//
+//$chart->xAxis->type = 'datetime';
+//$chart->xAxis->maxZoom = 14 * 24 * 3600000; // fourteen days
+//
+//$chart->yAxis->min = -3;
+//
+//$legend->enable = false;
+//$chart->set_legend($legend);
+//
+////$tooltip->formater = "function() {
+////            return ''+
+////               Highcharts.dateFormat('%A %B %e %Y', this.x) + ':'+
+////               '1 USD = '+ Highcharts.numberFormat(this.y, 2) +' EUR';
+////         }
+////";
+////$chart->set_tooltip($tooltip);
+//$plotOptions->line->enableMouseTracking = false;
+//
+//$chart->set_plot_options($plotOptions);
+//$serie = new DgstatsChartSerie('line', 'Points',$data['points']);
+//$serie->pointInterval = 24 * 3600 * 1000;
+//$serie->pointStart =  time();
+////$serie->pointStart =  'Date.UTC(2010, 0, 01)';
+//
+//$chart->add_serie($serie);
+////dgstats_charts_render_chart($chart);
+// $js .= 'Drupal.behaviors.dgstatsChart = function(){';
+////$js .= 'alert(Date.UTC(2010, 0, 01));';
+//$chart_key = 'player_evolution';
+////$arguments['playername'] = 'KaiZO';
+//$arguments->playername = 'KaiZO';
+//$args = array();
+//foreach($arguments as $key => $val){
+//  $args[] = $key . ':' . drupal_to_js($val);
+//}
+//$args_str = drupal_to_js($arguments);
+////$args_str = '{' .  implode(',', $args) . '}';
+//// $js .= "$.post('/js/charts/series',{key:'$chart_key',arguments:$args_str}, function(data){";
+//// $js .= "$.post('/js/charts/series',{key:'$chart_key',playername:'KaiZO'}, function(data){";
+//$js .= 'data = ' . $chart->toJS() . ';';
+//  $js .= 'chart = new Highcharts.Chart(data);';
+//// $js .= "});";
+//
+//  $js .= '}';
+//  drupal_add_js($js,'inline');
+  $chart_key = 'player_evolution';
+  $settings = array(
+    'dgstatsCharts' => array(
+      'playername' => 'KaiZO',
+    ),
+  );
+drupal_add_js($settings,'setting');
+dgstats_charts_render_chart($chart_key);
+//dpm($chart);
+//dpm($chart->toJS());
+//  dpm($data);
+  return $output;
+}
+
+
+class DgstatsChartSerie {
+
+    public $type = "";
+    public $name = "";
+    public $data = array();
+
+
+    function  __construct($type,$name,$data) {
+
+        $this->type = $type;
+        $this->name = $name;
+        $this->data = $data;
+
+
+    }
+}
+class DgstatsChart {
+
+    public $series = array();
+
+    public $chart;
+    public $plotOptions;
+    public $legend;
+//    public $tooltip;
+    public $title;
+
+    function  __construct($title) {
+      $this->chart = new stdClass();
+      $this->chart->renderTo = 'dgstats-charts-wrapper';
+      $this->title->text = $title;
+    }
+    function add_serie($serie){
+      $this->series[] = $serie;
+    }
+//    function add_serie($type,$name,$data) {
+//
+//        $serie = new DgstatsChartSerie($type,$name,$data);
+//
+//        $this->series[] = $serie;
+//    }
+    function set_title($title){
+      $this->title = $title;
+    }
+    function set_plot_options($options){
+      $this->plotOptions = $options;
+    }
+    function set_legend($legend){
+      $this->legend = $legend;
+    }
+    function set_tooltip($tooltip){
+      $this->tooltip = $tooltip;
+    }
+    function toObject() {
+//        $obj = new StdClass();
+        return $this;
+    }
+    function toJson() {
+        return json_encode($this);
+    }
+    function toJS(){
+//      foreach($this as $key => $val){
+//        $output .= $key . ':' .  dgstats_charts_js_val($this);
+        $output = drupal_to_js($this);
+//        dpm($output);
+//      }
+      return $output;
+    }
+}
+function dgstats_charts_js_val($var){
+  if(is_array($var)){
+    $output .= '[';
+    $arr = array();
+    foreach($var as $value){
+      $arr[] = dgstats_charts_js_val($value);
+//      $output .= ',' . dgstats_charts_js_val($value);
+//      implode(',', $arr);
+    }
+    $output .= implode(',', $arr);
+    $output .= '';
+
+    $output .= ']';
+    return $output;
+  } elseif (is_object($var)){
+    $arr = array();
+    $output .= '{';
+    foreach($var as $key =>$value){
+    $arr[] = $key . ':' . dgstats_charts_js_val($value);
+//      $output .= ',' . dgstats_charts_js_val($value);
+      
+    }
+ $output .= implode(',', $arr);
+    $output .= '}';
+    return $output;
+  } elseif (is_string($var)){
+    return "'$var'";
+  } elseif (is_bool($var)){
+    if(!$var){
+      return 'false';
+    } else {
+      return 'true';
+    }
+  } else {
+    return $var;
+  }
+}
+
+function dgstats_charts_series_page_js(){
+  $key = $_REQUEST['key'];
+  $chart_info = dgstats_charts_get_chart_info($key);
+   $arguments = array();
+  foreach($chart_info['arguments'] as $arg){
+    $arguments[$arg] = $_REQUEST[$arg];
+  }
+//  $arguments = $_REQUEST['arguments'];
+ 
+//  foreach($_REQUEST as $key => $val){
+//    $arguments[$key] = $val;
+//  }
+//
+  $chart_data = dgstats_charts_get_chart_data($key, $arguments);
+//  dpm($arguments);
+//  dpm($chart_data);
+  print drupal_json($chart_data);
+//  print $chart->toJson();
+  exit();
+}
+function dgstats_charts_dgstatsplayer($op,$player){
+  switch($op){
+    case 'view':
+        $chart_key = 'player_evolution';
+        $settings = array(
+          'dgstatsCharts' => array(
+            'playername' =>$player['playername'],
+          ),
+        );
+      drupal_add_js($settings,'setting');
+      dgstats_charts_render_chart($chart_key);
+      return array(
+        'charts' => array(
+          '#title' => '',
+          '#output' => '<div id="dgstats-charts-player-evolution-wrapper"></div>',
+          '#weight' => 2,
+        ),
+      );
+
+  }
+
+}

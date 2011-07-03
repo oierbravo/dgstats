@@ -1,0 +1,246 @@
+<?php
+/**
+ *  Project: Drupal Ghost Stats
+ *
+ *  Copyright (C) 2009 Oier Bravo Urtasun
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Affero General Public License as
+ *    published by the Free Software Foundation, either version 3 of the
+ *    License, or (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+define('DGSTATS_PAGE_LIVE','server/live');
+
+
+
+
+function dgstats_live_init(){
+  //drupal_add_css(drupal_get_path('module','dgstats_live'). '/dgstats-live.css');
+  if(user_access('access ghost live')){
+    drupal_add_css(drupal_get_path('module','dgstats_live'). '/css/jquery.gritter.css');
+    drupal_add_css(drupal_get_path('module','dgstats_live'). '/css/dgstatsGritter.css');
+
+    drupal_add_js(drupal_get_path('module','dgstats_live'). '/js/jquery.gritter.min.js');
+    drupal_add_js(drupal_get_path('module','dgstats_live'). '/js/botEventsGrowl.js');
+    $settings = array(
+      'dgstatsLive' => array(
+        'hashKey' => $hash_key,
+      ),
+    );
+    drupal_add_js($settings, 'setting');
+  }
+}
+function _dgstats_live_get_actual_hash_key(){
+  $hash_key =  variable_get('dgstats_live_actual_hash_key',0);
+  if($hash_key == 0){
+    $hash_key = md5(time());
+    _dgstats_live_set_actual_hash_key($hash_key);
+
+  }
+  return $hash_key;
+}
+function _dgstats_live_set_actual_hash_key($hash_key){
+    variable_set('dgstats_live_actual_hash_key',$hash_key);
+}
+function _dgstats_live_new_hash_key(){
+     $hash_key = md5(time());
+    _dgstats_live_set_actual_hash_key($hash_key);
+}
+function dgstats_live_menu(){
+  $items = array();
+
+  $items[DGSTATS_PAGE_LIVE . '/js/get-events'] = array(
+    //'title' => 'Current game',
+    'page callback' => 'dgstats_live_get_events_js_page',
+    'access arguments' =>array('access ghost stats'),
+    'page arguments' => array(2),
+    // 'menu_name' => 'primary-links',
+  );
+  return $items;
+}
+function dgstats_live_get_events_js_page(){
+  $last_eid = $_REQUEST['last_eid'];
+  $hash_key = $_REQUEST['hash_key'];
+  
+  $now = time();
+  $delay = 60;
+  $min_time = $now - 60;
+  $ignores = _dgstats_live_ignores();
+  $ignore_str = '';
+//  foreach($ignores as $ignore){
+//    $ignore_str .= " AND key !='$ignore'";
+//  }
+  $sql = "SELECT eid from {dotagame_events} WHERE eid > %s AND timestamp > %s" . $ignore_str;
+  $result = db_query($sql,$last_eid,$min_time);
+  $events = array();
+  while($row = db_result($result)){
+    $event = dgstats_live_process_event( live_event_load($row));
+    //dgstats_live_process_event($event);
+    $events[] = $event;
+  }
+  $js = array(
+    'data' => array(
+      'events' => $events
+    ),
+  );
+  print drupal_to_js($js);
+  exit();
+  
+}
+function dgstats_live_perm(){
+   return array(
+    'access ghost live',
+
+  );
+}
+function _dgstats_live_ignores(){
+  return array(
+    'winner','tree','throne'
+  );
+}
+function dgstats_live_process_event($event){
+  $func = 'dgstats_live_process_event_' . $event['key'];
+  if(function_exists($func)){
+
+  } else {
+    $func = 'dgstats_live_process_event_default';
+  }
+  $func($event);
+  return $event;
+}
+function dgstats_live_process_event_default(&$event){
+  $event['title'] = $event['key'];
+  $event['text'] = $event['timestamp'] . '<br/>' . $event['args'];
+
+
+}
+function dgstats_live_process_event_game_init_host(&$event){
+  $time = date('G:i',$event['timestamp']);
+  $body = $time . ' - ' . t('Game name') . ': ' . $event['args'];
+
+  $event['title'] = t('New game in the lobbby');
+  $event['text'] = $body;
+
+}
+function dgstats_live_process_event_game_loaded(&$event){
+  //0|0|Gero|dota|mapsdownloadDotA v6.68c.w3x|-rdso eu pros come fast 1
+  $time = date('G:i',$event['timestamp']);
+  $args_arr = explode('|',  $event['args']);
+
+
+  $body = $time . ' - ' . t('Game name') . ': ' . $args_arr[5] . '<br/>';
+  $body .= 'Owner: ' . $args_arr[2];
+  $event['title'] = t('Game started');
+  $event['text'] = $body;
+  $event['class_name'] = 'gritterGreen';
+
+}
+function dgstats_live_process_event_ban(&$event){
+  $time = date('G:i',$event['timestamp']);
+  $body = $time;
+  $playername = $event['args'];
+  $event['title'] = t('Player @playername BANNED',array('@playername' => $playername));
+  $event['text'] = $body;
+  $event['class_name'] = 'gritterRed';
+  
+
+}
+function dgstats_live_process_event_game_end(&$event){
+   $args_arr = explode(' ',  $event['args']);
+   $gameid = $args_Arr[0];
+   $gamename = $args_arr[1];
+   $body = $gamename;
+  $event['title'] = t('Game finished.');
+  $event['text'] = $body;
+  $event['class_name'] = 'gritterBlue';
+
+}
+
+function dgstats_live_process_event_rax(&$event){
+  //0 [X]GodLike[X] melee Scourge mid
+  $args_arr = explode(' ',  $event['args']);
+  $gameid = $args_arr[0];
+  $killer = $args_arr[1];
+  $type = $args_arr[2];
+  $alliance = $args_arr[3];
+  $side = $args_arr[4];
+  $event['title'] = t('Rax destroyed');
+  $replace = array(
+    '@killer' => $killer,
+    '@type' => $level,
+    '@alliance' => $alliance,
+    '@side' => $side,
+  );
+  $event['title'] = t('Tower destroyed');
+ $event['text'] = t('@killer has destroyed the @side @type @alliance rax.',$replace);
+
+
+}
+function dgstats_live_process_event_tower(&$event){
+  //0 HiFriT 1 Scourge top
+  $args_arr = explode(' ',  $event['args']);
+
+  $gameid = $args_arr[0];
+  $killer = $args_arr[1];
+  $level = $args_arr[2];
+  $alliance = $args_arr[3];
+  $side = $args_arr[4];
+
+  $event['title'] = t('Tower destroyed');
+  $replace = array(
+    '@killer' => $killer,
+    '@level' => $level,
+    '@alliance' => $alliance,
+    '@side' => $side,
+  );
+  $event['text'] = t('@killer has destroyed a @side level @level @alliance tower.',$replace);
+
+
+}
+function dgstats_live_process_event_kill(&$event){
+  //0 Gero kolbasz
+  $args_arr = explode(' ', $event['args']);
+  $gameid = $args_arr[0];
+  $killer = $args_arr[1];
+  $victim = $args_arr[2];
+  $event['title'] = t('@victim has been killed',array('@victim'=>$victim));
+  if($killer == 'Scourge' || $killer == 'Sentinel'){
+    $event['text'] = t('by: the @killer',array('@killer'=>$killer));
+  }
+
+  
+  $event['text'] =t('by: @killer',array('@killer'=>$killer));
+  if($killer == $victim){
+     $event['title'] = t('Suicide');
+     $event['text'] = t('@killer has killed himself.',array('@killer'=>$killer));
+  }
+
+}
+
+function _dgstats_live_key_map(){
+
+  //ban kill rax tower tree throne winner game_init_host game_loaded game_end
+  return array(
+
+
+  );
+}
+
+function live_event_load($eid){
+  if(!is_numeric($eid)){
+    return drupal_access_denied();
+  }
+  $sql = "SELECT * from {dotagame_events} WHERE eid = %s";
+  $result = db_query($sql,$eid);
+  $event = db_fetch_array($result);
+  drupal_alter('live_event',$event);
+  return $event;
+}

@@ -1,0 +1,288 @@
+<?php
+/**
+ *  Project: Drupal Ghost Stats
+ *  
+ *
+ *  This modules contains most configuration related task.
+ *  Its part of the required modules.
+ *
+ *  Copyright (C) 2009 Oier Bravo Urtasun
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Affero General Public License as
+ *    published by the Free Software Foundation, either version 3 of the
+ *    License, or (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+define('DGSTATS_PAGE_CONFIG','config');
+
+define('DGSTATS_CONFIG_GHOST_CFG','ghost.cfg');
+
+define('DGSTATS_CONFIG_PARSE_OK','true');
+define('DGSTATS_CONFIG_PARSE_FAIL','false');
+//define('DGSTATS_CONFIG_GHOST_CFG','data/process.ini');
+function dgstats_config_menu(){
+  $items = array();
+  $items[DGSTATS_PAGE_CONFIG] = array(
+    'title' => 'Config',
+    'page callback' => 'dgstats_config_page_config',
+    'access arguments' =>array('administer ghost stats'),
+    // 'menu_name' => 'primary-links',
+  );
+  return $items;
+}
+function dgstats_config_perm(){
+  return array(
+    'administer ghost stats',
+
+  );
+}
+function dgstats_config_page_config(){
+  $output = '';
+  $output = drupal_get_form('dgstats_config_form_baseconfig');
+  return $output;
+
+}
+
+function dgstats_config_dgstatsconfig($op){
+  switch($op){
+    case 'form':
+      $form = array();
+      $botdir = variable_get('dgstats_config_botdir', '');
+      $form['botconfig'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Bot config'),
+        '#weight' => 0,
+        '#collapsible' => TRUE,
+        '#collapsed' => FALSE,
+      );
+
+
+      $form['botconfig']['botdir'] = array(
+        '#type' => 'textfield',
+        '#default_value' => $botdir,
+        '#title' => 'Bot installation path',
+        '#description' => 'Path relative to drupal installation.Example: ./ghostone',
+        '#required' => TRUE,
+      );
+      if($botdir != ''){
+        $text_filenames = _dgstats_config_file_names();
+        foreach($text_filenames as $key => $text_file_name){
+
+          $file_path = $botdir . '/' . $text_file_name;
+          $file_content = file_get_contents($file_path);
+
+          $form['botconfig']['textfile-' . $key] = array(
+            '#type' => 'textarea',
+            '#title' => 'File: ' . $text_file_name,
+            '#default_value' => $file_content,
+          );
+        }
+
+      }
+      return $form;
+    case 'validate':
+      return array('dgstats_config_botconfig_validate');
+      break;
+    case 'submit':
+      return array('dgstats_config_botconfig_submit');
+      break;
+
+  }
+}
+function dgstats_config_botconfig_validate($form_id, &$form_state){
+//  dpm('validando botconfig');
+ 
+    $botdir = $form_state['values']['botdir'];
+    if(!is_dir($botdir)){
+      form_set_error('botdir', t('Directory %directory not exists or not readable.',array('%directory' => $botdir)));
+    }
+//    file_check_directory($botdir, 'r', 'botdir');
+
+}
+function dgstats_config_botconfig_submit($form_id, &$form_state){
+   $botdir = $form_state['values']['botdir'];
+     variable_set('dgstats_config_botdir', $botdir);
+
+     $text_filenames = _dgstats_config_file_names();
+     foreach($text_filenames as $key => $text_file_name){
+       $file_path = $botdir . '/' . $text_file_name;
+       $data = $form_state['values']['textfile-' . $key];
+       if(file_exists($file_path)){
+          file_put_contents($file_path, $data);
+       }
+
+     }
+}
+function dgstats_config_form_baseconfig(){
+  $form = array();
+
+  $form += module_invoke_all('dgstatsconfig','form');
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Submit',
+  );
+  $validation = module_invoke_all('dgstatsconfig','validate');
+  $submit =  module_invoke_all('dgstatsconfig','submit');
+ // dpm($validation,$submit);
+  $form['#validate'] = $validation;
+  $form['#submit'] = $submit;
+  return $form;
+}
+/**
+ * Implementation of hook_validate()
+ */
+function dgstats_config_form_baseconfig_validate($form_id, &$form_state) {
+  
+}
+
+function dgstats_config_form_baseconfig_submit($form_id, &$form_state) {
+  
+     _dgstas_config_load_bot_config();
+}
+
+function _dgstats_config_get_welcome(){
+  //$file = file_get_contents('./ghostone-read-only/changelog.txt');
+  //dpm($file);
+
+}
+
+function _dgstats_config_file_names(){
+  $names = array(
+    'gameloaded' => 'gameloaded.txt',
+    'gameover' => 'gameover.txt',
+    'welcome' => 'welcome.txt',
+  );
+
+  return $names;
+}
+
+function _dgstas_config_load_bot_config(){
+//  $config_cfg = _dgstats_parse_config_cfg();
+//  //dpm($config_cfg);
+//  if(!$config_cfg){
+//    drupal_set_message('Errors parsing config file');
+//    return;
+//  }
+//  foreach($config_cfg as $key => $val){
+//    variable_set('dgstats_' . $key,$val);
+//
+//  }
+  variable_set('dgstats_bot_maxgames',2);
+  variable_set('dgstats_udp_cmdport',6969);
+  variable_set('dgstats_config_ok',DGSTATS_CONFIG_PARSE_OK);
+//  drupal_set_message('Succesfully parsed config file');
+}
+
+function _dgstats_config_ghost_cfg_variables(){
+  return array(
+      'bot_maxgames',
+      'udp_cmdport',
+  );
+}
+
+function _dgstats_parse_config_cfg(){
+   $botdir = variable_get('dgstats_config_botdir','');
+  if($botdir == ''){
+    drupal_set_message('Need to config botdir.', 'error');
+  }
+  $processfile = _parse_ini_file($botdir . '/' .  DGSTATS_CONFIG_GHOST_CFG);
+  dpm($processfile);
+  if(!$processfile){return false;}
+  //dpm($processfile);
+  $names = _dgstats_config_ghost_cfg_variables();
+  $output = array();
+  foreach($names as $name){
+    $output[$name] = $processfile[0][$name];
+  }
+  return $output;
+}
+
+/**
+ * Added this function because parse_ini_file fails with ghost.cfg
+ *
+ **/
+function _parse_ini_file($file, $process_sections = false) {
+  $process_sections = ($process_sections !== true) ? false : true;
+
+  $ini = file($file);
+  if(!$ini){return false;}
+  if (count($ini) == 0) {return array();}
+
+  $sections = array();
+  $values = array();
+  $result = array();
+  $globals = array();
+  $i = 0;
+  foreach ($ini as $line) {
+    $line = trim($line);
+    $line = str_replace("\t", " ", $line);
+
+    // Comments
+    if (!preg_match('/^[a-zA-Z0-9[]/', $line)) {continue;}
+
+    // Sections
+    if ($line{0} == '[') {
+      $tmp = explode(']', $line);
+      $sections[] = trim(substr($tmp[0], 1));
+      $i++;
+      continue;
+    }
+
+    // Key-value pair
+    list($key, $value) = explode('=', $line, 2);
+    $key = trim($key);
+    $value = trim($value);
+    if (strstr($value, ";")) {
+      $tmp = explode(';', $value);
+      if (count($tmp) == 2) {
+        if ((($value{0} != '"') && ($value{0} != "'")) ||
+            preg_match('/^".*"\s*;/', $value) || preg_match('/^".*;[^"]*$/', $value) ||
+            preg_match("/^'.*'\s*;/", $value) || preg_match("/^'.*;[^']*$/", $value) ){
+          $value = $tmp[0];
+        }
+      } else {
+        if ($value{0} == '"') {
+          $value = preg_replace('/^"(.*)".*/', '$1', $value);
+        } elseif ($value{0} == "'") {
+          $value = preg_replace("/^'(.*)'.*/", '$1', $value);
+        } else {
+          $value = $tmp[0];
+        }
+      }
+    }
+    $value = trim($value);
+    $value = trim($value, "'\"");
+
+    if ($i == 0) {
+      if (substr($line, -1, 2) == '[]') {
+        $globals[$key][] = $value;
+      } else {
+        $globals[$key] = $value;
+      }
+    } else {
+      if (substr($line, -1, 2) == '[]') {
+        $values[$i-1][$key][] = $value;
+      } else {
+        $values[$i-1][$key] = $value;
+      }
+    }
+  }
+
+  for($j = 0; $j < $i; $j++) {
+    if ($process_sections === true) {
+      $result[$sections[$j]] = $values[$j];
+    } else {
+      $result[] = $values[$j];
+    }
+  }
+
+  return $result + $globals;
+}

@@ -1,0 +1,532 @@
+<?php
+/**
+ *  Project: Drupal Ghost Stats
+ *
+ *  Copyright (C) 2009 Oier Bravo Urtasun
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Affero General Public License as
+ *    published by the Free Software Foundation, either version 3 of the
+ *    License, or (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+define('DGSTATS_PAGE_SERVER','server');
+
+define('DGSTATS_BLOCK_SERVER_STATS',0);
+define('DGSTATS_BLOCK_SERVER_STATS_LITE',1);
+
+define('DGSTATS_EUROBATTLE_ALIVE_TRUE','online');
+define('DGSTATS_EUROBATTLE_ALIVE_FALSE','offline');
+
+define('DGSTATS_BOT_ALIVE_TRUE','online');
+define('DGSTATS_BOT_ALIVE_FALSE','offline');
+
+define('DGSTATS_BOT_HOSTING_TRUE','hosting');
+define('DGSTATS_BOT_HOSTING_FALSE','not hosting');
+
+define('DGSTATS_BOT_INLOBBY_TRUE',1);
+define('DGSTATS_BOT_INLOBBY_FALSE',0);
+
+
+
+function dgstats_server_init(){
+  drupal_add_css(drupal_get_path('module','dgstats_server'). '/dgstats-server.css');
+  $botdir = variable_get('dgstats_config_botdir','');
+  if($botdir == ''){
+    drupal_set_message('Need to config botdir.', 'error');
+  }
+}
+
+function dgstats_server_menu(){
+  $items = array();
+  $items[DGSTATS_PAGE_SERVER] = array(
+    'title' => 'Server status',
+    'page callback' => 'dgstats_server_page_server',
+    'access arguments' =>array('access ghost stats'),
+    // 'menu_name' => 'primary-links',
+  );
+  $items[DGSTATS_PAGE_SERVER . '/currentgames'] = array(
+    'title' => 'Current games',
+    'page callback' => 'dgstats_server_page_currentgames',
+    'access arguments' =>array('access ghost stats'),
+    // 'menu_name' => 'primary-links',
+  );
+  $items[DGSTATS_PAGE_SERVER . '/currentgames/%'] = array(
+    'title' => 'Current game',
+    'page callback' => 'dgstats_server_page_currentgames_game',
+    'access arguments' =>array('access ghost stats'),
+    'page arguments' => array(2),
+    // 'menu_name' => 'primary-links',
+  );
+  return $items;
+}
+function dgstats_server_page_server(){
+//  $breadcrumb = drupal_get_breadcrumb();
+//  $breadcrumb = array(l(t('Home'),'/'));
+//  drupal_set_breadcrumb($breadcrumb);
+  $output = '';
+  $output .= theme('server_stats',dgstats_server_get_server_stats());
+  $output .= theme('server_stats',dgstats_server_get_server_stats_lite());
+  $current_games = _dgstats_get_full_get_current_games_full();
+  $output .= theme('currentgames',$current_games);
+  return $output;
+
+}
+function dgstats_server_page_currentgames(){
+  $breadcrumb = drupal_get_breadcrumb();
+  $breadcrumb[] = l('Server',DGSTATS_PAGE_SERVER);
+
+  drupal_set_breadcrumb($breadcrumb);
+  $output = '';
+  $current_games = _dgstats_get_full_get_current_games_full();
+  $output .= theme('currentgames',$current_games);
+  return $output;
+}
+function dgstats_server_page_currentgames_game($gameid){
+  $breadcrumb = drupal_get_breadcrumb();
+  $breadcrumb[] = l('Server',DGSTATS_PAGE_SERVER);
+  drupal_set_breadcrumb($breadcrumb);
+  $output = '';
+//  dpm(func_get_args());
+  $current_game = _dgstats_server_get_current_game($gameid);
+  if(count($current_game) == 0){
+    return 'Game not active.';
+  }
+//  dpm($current_game);
+  $players = $current_game['players'];
+  $game_rows = array();
+  $current_game_header = _dgstats_get_table_header('current_game');
+  $current_players_header = _dgstats_get_table_header('current_players');
+  
+  foreach($current_game_header as $field){
+    $current_game_rows[$gameid][$field['field']] = $current_game[$field['field']];
+  }
+
+  $output .= theme('table',$current_game_header,$current_game_rows);
+
+  $current_game_players_rows = array();
+  $i = 0;
+  foreach($players as $player){
+    foreach($current_players_header as $field){
+      $current_game_players_rows[$i][] = $player[$field['field']];
+    }
+    $i++;
+  }
+  $output .= theme('table',$current_players_header,$current_game_players_rows);
+//dpm($current_game_players_rows);
+  return $output;
+}
+function dgstats_server_dgstats_server_nohook(){
+    $serverstats = array();
+//    variable_set('dgstats_current_lobby','pp');
+   $current_lobby = variable_get('dgstats_current_lobby','');
+   if($current_lobby != ''){
+       $serverstats['botlobby'] = array(
+        'label' => $current_lobby,
+        'data' => ' in the lobby',
+        'theme' => 'botinlobby',
+        'gamename' => $current_lobby,
+        'lite' => true,
+        );
+   } else {
+      $serverstats['botlobby'] = array(
+          'label' => '',
+          'data' => 'No game in the lobby',
+          'lite' => true,
+         // 'theme' => 'botnumgames',
+       );
+   }
+//  $config_parsed = variable_get('dgstats_config_ok',DGSTATS_CONFIG_PARSE_FAIL);
+//  $ebnet_status = dgstats_get_eurobattle_status();
+//  $serverstats['eurobattlealive'] = array(
+//    'label' => 'Eurobattle is ',
+//    'data' => $ebnet_status,
+//    'theme' => 'eurobattlealive',
+//    'lite' => true,
+//  );
+//  if($ebnet_status == DGSTATS_EUROBATTLE_ALIVE_TRUE){
+//    if($config_parsed == DGSTATS_CONFIG_PARSE_FAIL){
+//      drupal_set_message('Need to load bot\'s config file','error');
+//      return array();
+//    }
+//    $botalive = _dgstats_server_get_ghost_alive();
+//    $serverstats['botalive'] = array(
+//      'label' => 'Bot is ',
+//      'data' => $botalive,
+//      'theme' => 'botalive',
+//      'lite' => true,
+//    );
+//    if($botalive == DGSTATS_BOT_ALIVE_TRUE){
+//      $hostinginfo = _dgstats_server_get_hosting();
+//
+//
+//      $serverstats['botnumgames'] = array(
+//        'label' => 'Actually playing ',
+//        'data' => $botnumgames . ' games',
+//        'theme' => 'botnumgames',
+//        'numgames' => $hostinginfo['NumGames'],
+//        'maxgames' => variable_get('dgstats_bot_maxgames',0),
+//        'lite' => true,
+//      );
+//      if($hostinginfo['GameInLobby'] == 0){
+//        $serverstats['botlobby'] = array(
+//          'label' => '',
+//          'data' => 'No game in the lobby',
+//          'lite' => true,
+//         // 'theme' => 'botnumgames',
+//       );
+//      } else {
+//       $serverstats['botlobby'] = array(
+//        'label' => $hostinginfo['GameInLobbyName'],
+//        'data' => ' in the lobby',
+//        'theme' => 'botinlobby',
+//        'gamename' => $hostinginfo['GameInLobbyName'],
+//          'lite' => true,
+//        );
+//      }
+//    }
+//  }
+  return $serverstats;
+}
+function dgstats_server_block($op='list', $delta=0, $edit=array()) {
+  switch ($op) {
+    case 'list':
+      $blocks[DGSTATS_BLOCK_SERVER_STATS] = array(
+        'info'       => t('DGStats Server Stats'),
+      );
+      $blocks[DGSTATS_BLOCK_SERVER_STATS_LITE] = array(
+        'info'       => t('DGStats Server Stats Lite'),
+      );
+      return $blocks;
+  case 'configure':
+
+      $form = array();
+      return $form;
+    case 'save':
+
+      return;
+    case 'view': default:
+      switch ($delta) {
+        case DGSTATS_BLOCK_SERVER_STATS:
+
+          $block['subject'] = 'Server Stats';
+          $block['content'] = dgstats_server_block_contents($delta);
+          break;
+        case DGSTATS_BLOCK_SERVER_STATS_LITE:
+
+          $block['subject'] = '';
+          $block['content'] = dgstats_server_block_contents($delta);
+          break;
+      }
+      return $block;
+
+  }
+}
+
+function dgstats_server_block_contents($delta){
+  switch ($delta) {
+        case DGSTATS_BLOCK_SERVER_STATS:
+
+          return  theme('server_stats',dgstats_server_get_server_stats());
+          break;
+        case DGSTATS_BLOCK_SERVER_STATS_LITE:
+
+          return  theme('server_stats',dgstats_server_get_server_stats_lite());
+          break;
+        default:
+          break;
+  }
+}
+function _dgstats_server_get_ghost_alive(){
+  $botdir = variable_get('dgstats_config_botdir','');
+  if($botdir == ''){
+    drupal_set_message('Need to config botdir.', 'error');
+  }
+  $processfile = parse_ini_file($botdir . '/data/process.ini');
+//  $processfile = true;
+//  dpm($processfile);
+  if(!$processfile){
+    return DGSTATS_BOT_ALIVE_FALSE;
+  } else {
+    $pid = $processfile['ProcessID'];
+    $cmd = "ps -p $pid --no-heading";
+    $result = exec($cmd);
+  }
+    if ($result == ''){
+      return DGSTATS_BOT_ALIVE_FALSE;
+    } else {
+      return DGSTATS_BOT_ALIVE_TRUE;
+    }
+  
+}
+function _dgstats_server_get_hosting_refresh(){
+//  $host = 'localhost';
+// $host = "alvicio.hopto.org";
+//  $msg = 'getgames';
+//    if ( //If
+//        function_exists('socket_create') AND //socket_create exists
+//        $sock = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP) AND //Can create the socket
+//        $sock_data = socket_connect($sock, $host, 6969) //Can connect to the socket
+//    ) {  //Then
+//        $sock_data = socket_set_option($sock, SOL_SOCKET, SO_BROADCAST, 1); //Set
+//        $sock_data = socket_write($sock, $msg, strlen($msg)); //Send data
+//
+//        socket_close($sock); //Close socket
+//        return true;
+//    } else //Esle? :P
+//        return false;
+}
+function _dgstats_server_get_hosting(){
+  
+//  $refresh = _dgstats_server_get_hosting_refresh();
+//  if(!$refresh){
+//    drupal_set_message('Error refreshing bot hosting status, data may be old.');
+//  }
+//  $botdir = variable_get('dgstats_config_botdir','');
+//  if($botdir == ''){
+//    drupal_set_message('Need to config botdir.', 'error');
+//  }
+  //$hostinginfo = parse_ini_file($botdir . '/data/games.ini');
+  $hostinginfo['NumGames'] = count(_dgstats_server_get_current_games());
+  $hostinginfo['GameInLobby'] = dgstats_get_botlobby_status();
+  $hostinginfo['GameInLobbyName'] = '';
+//  dpm($hostinginfo);
+  return $hostinginfo;
+  
+}
+function dgstats_server_get_server_stats(){
+  $stats = array();
+  //$stats['games'] = _dgstats_get_total_games();
+  //$stats['bans']= _dgstats_get_total_bans();
+  //$stats['admins']= _dgstats_get_total_admins();
+  //$stats['players']= _dgstats_get_total_players();
+  $stats = module_invoke_all('dgstats_server');
+
+  return $stats;
+}
+function dgstats_server_get_server_stats_lite(){
+  $stats = array();
+  //$stats['games'] = _dgstats_get_total_games();
+  //$stats['bans']= _dgstats_get_total_bans();
+  //$stats['admins']= _dgstats_get_total_admins();
+  //$stats['players']= _dgstats_get_total_players();
+
+  //$stats = module_invoke('dgstats_server', 'dgstats_server');
+  $stats = dgstats_server_dgstats_server_nohook();
+
+  return $stats;
+}
+
+function dgstats_server_theme(){
+  return array(
+     'server_stats' => array(
+      'arguments' => array('server_stats' => null),
+    ),
+    'botalive' => array(
+      'arguments' => array('item' => null),
+    ),
+     'eurobattlealive' => array(
+      'arguments' => array('item' => null),
+    ),
+    'bothosting' => array(
+      'arguments' => array('item' => null),
+    ),
+     'botnumgames' => array(
+      'arguments' => array('item' => null),
+    ),
+     'botinlobby' => array(
+      'arguments' => array('item' => null),
+    ),
+     'current_gamename' => array(
+     'arguments' => array('gid' => 0,'gamename' => null)
+      ),
+      'currentgames' => array(
+     'arguments' => array('games' => array(),)
+      ),
+  );
+}
+function theme_botalive($item){
+  $output = '';
+  if($item['data'] == DGSTATS_BOT_ALIVE_TRUE){
+    $class = 'botonline';
+  } else {
+     $class = 'botoffline';
+  }
+  $output = $item['label'] . '<span class="' . $class . '">' . $item['data'] . '</span>';
+  return $output;
+}
+function theme_eurobattlealive($item){
+  $output = '';
+  if($item['data'] == DGSTATS_EUROBATTLE_ALIVE_TRUE){
+    $class = 'botonline';
+  } else {
+     $class = 'botoffline';
+  }
+  $output = $item['label'] . '<span class="' . $class . '">' . $item['data'] . '</span>';
+  return $output;
+}
+function theme_bothosting($item){
+  $output = '';
+    if($item['data'] == DGSTATS_BOT_HOSTING_TRUE){
+    $class = 'bothosting';
+  } else {
+     $class = 'botnothosting';
+  }
+  $output = $item['label'] . '<span class="' . $class . '">' . $item['data'] . '</span>';
+  return $output;
+
+}
+function theme_server_stats($stats){
+   $output = '';
+   foreach($stats as $stat){
+     if(!isset($stat['theme'])){
+      $fstats[] = $stat['label'] . ' ' . $stat['prefix'] . $stat['data'] .$stat['suffix'];
+
+     } else {
+       $fstats[] = theme($stat['theme'],$stat);
+     }
+   }
+  
+   if(arg(0) != 'server'){
+     $fstats[] = l('Full Info',DGSTATS_PAGE_SERVER . '/status');
+   }
+   $output .= theme('item_list',$fstats);
+   return $output;
+}
+
+function theme_botnumgames($item){
+   $output = '';
+    if($item['numgames'] == 0){
+    $class = 'botnothosting';
+  } else {
+     $class = 'bothosting';
+  }
+
+  $numgames = $item['numgames'] . ' / ' . $item['maxgames'];
+  $output ='<span class="' . $class . '">' . $numgames . '</span>' . ' games in progress.';
+  return $output;
+}
+function theme_botinlobby($item){
+  $class = 'bothosting';
+  
+  $output ='<span class="' . $class . '">' . $item['gamename'] . '</span>' . ' in the lobby';
+  return $output;
+}
+
+function dgstats_get_eurobattle_status(){
+  $host = 'server.eurobattle.net';
+  $port = '6112';
+  $connection = @fsockopen($host, $port);
+  if ($connection) {
+    fclose($connection);
+    return DGSTATS_EUROBATTLE_ALIVE_TRUE;
+  } else {
+    return DGSTATS_EUROBATTLE_ALIVE_FALSE;
+  }
+}
+function dgstats_get_botlobby_status(){
+  $host = 'alvicio.hopto.org';
+  $port = '6112';
+  $connection = @fsockopen($host, $port);
+  if ($connection) {
+    fclose($connection);
+    return DGSTATS_BOT_INLOBBY_TRUE;
+  } else {
+    return DGSTATS_BOT_INLOBBY_FALSE;
+  }
+}
+
+
+function _dgstats_server_get_current_games(){
+   $sql = "SELECT * from currentgames";
+   $actual_games = array();
+   $result = db_query($sql);
+   while($row = db_fetch_array($result)){
+     $actual_games[] = $row;
+   }
+
+   return $actual_games;
+
+}
+function _dgstats_server_get_current_game($gameid){
+
+   $sql = "SELECT * from currentgames where gid = $gameid";
+   $actual_game = array();
+   $result = db_query($sql);
+
+
+   while($row = db_fetch_array($result)){
+     $actual_game = $row;
+     $players = _dgstats_server_get_current_players($gameid);
+     $actual_game['players'] = $players;
+   }
+
+   return $actual_game;
+
+}
+function _dgstats_server_get_current_players($gameid){
+   $sql = "SELECT * from currentplayers where gid = $gameid AND playername <> '' ";
+   $order_str = _dgstats_get_order_str('current_players');
+   $sql .= $order_str;
+   $actual_players = array();
+   $result = db_query($sql);
+   while($row = db_fetch_array($result)){
+     $actual_players[] = $row;
+   }
+
+   return $actual_players;
+}
+
+function _dgstats_get_full_get_current_games_full(){
+  $games = _dgstats_server_get_current_games();
+  $full = array();
+  foreach($games as $game){
+    $players = _dgstats_server_get_current_players($game['gid']);
+    $full[$game['gid']] = $game;
+    $full[$game['gid']]['players'] = $players;
+  }
+  return $full;
+}
+
+function theme_current_gamename($game){
+  $output = '';
+  $output .= l($game['name'],DGSTATS_PAGE_SERVER . '/currentgames/' . $game['gid']);
+  return $output;
+}
+function theme_currentgames($current_games){
+  $output ='';
+  if(count($current_games) == 0){
+    return 'No active game.';
+  }
+  //dpm($current_games);
+  $current_game_header = _dgstats_get_table_header('current_game');
+
+  for($i = 0;$i < count($current_games);$i++){
+    foreach($current_game_header as $field){
+
+    if(isset($field['theme'])){
+      $field_theme_func_args = array();
+      $field_theme_func_args[] = $field['theme'];
+      $field_func_args = explode(',',$field['theme arguments']);
+
+//      foreach($field_func_args as $arg){
+//        $field_theme_func_args[] = $current_games[$i][$arg];
+//      }
+      $field_theme_func_args[]  = $current_games[$i];
+//      dpm($field_theme_func_args);
+      $games_rows[$i][]  = call_user_func('theme',$field['theme'],$current_games[$i]);
+    } else {
+      $games_rows[$i][]  = $current_games[$i][$field['field']];
+    }
+  }
+   $output .= theme('table',$current_game_header,$games_rows);
+  }
+  return $output;
+}

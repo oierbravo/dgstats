@@ -1,0 +1,109 @@
+<?php
+function dgstats_game_chat_menu() {
+
+  $items[DGSTATS_PAGE_GAMES . '/%game/chat'] = array(
+    'title' => 'Game chat',
+    'page callback' => 'dgstats_game_chat_page',
+    'page arguments' => array(1),
+    'access arguments' =>array('access ghost stats'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  return $items;
+}
+function dgstats_game_chat_page($game){
+  $output = '';
+//  dpm($game);
+  $replay_url = $game['replay']['full_path'];
+  $parser_url = drupal_get_path('module','dgstats_game_chat') . '/chat.php';
+  require $parser_url;
+  $replay = new replay($replay_url);
+  dpm($replay);
+  $players = array();
+  foreach($replay->teams as $team){
+    foreach($team as $player_id => $player){
+      $players[$player_id] = $player;
+    }
+  }
+  $output = theme_dgstats_game_chat_table($replay->chat,$players);
+  return $output;
+}
+function theme_dgstats_game_chat_table($chat,$players){
+  $rows = array();
+    foreach($chat as $chat_line){
+      $rows[] = _dgstats_game_chat_row($chat_line,$players);
+    }
+    $headers = array('h1');
+
+    return theme('table',$headers, $rows,array());
+
+}
+function _dgstats_game_chat_row($chat_line,$players){
+  $row = array();
+  $output = '';
+  $output .= dgstats_secondsToTime($chat_line['time']/1000) . '|' ."{$chat_line['mode']}" . ': ';
+  switch(strval($chat_line['mode'])){
+    case 'All':
+      $output .= $chat_line['player_name']. '->' .$chat_line['text'];
+      break;
+    case 'Allies':
+      $output .= $chat_line['player_name']. '->' .$chat_line['text'];
+      break;
+    default:
+    case 'System':
+      
+      switch($chat_line['type']){
+        case 'Hero':
+          $output .= dgstats_game_chat_get_playername($chat_line['killer'],$players) . ' ' .$chat_line['text'] . ' '. dgstats_game_chat_get_playername( $chat_line['victim'],$players);
+          break;
+        case 'Tower':
+//          dpm($chat_line);
+          $output .= dgstats_game_chat_get_playername($chat_line['killer'],$players) . ' ' .$chat_line['text'] . ' '.  $chat_line['team'] . ' ' .$chat_line['side'] . ' tower' ;
+          break;
+        case 'Rax':
+//          dpm($chat_line);
+          $output .= dgstats_game_chat_get_playername($chat_line['killer'],$players) . ' ' .$chat_line['text'] . ' '.  $chat_line['team']. ' ' .$chat_line['side'] . ' ' .$chat_line['raxtype'] . ' rax' ;
+          break;
+        default:
+        case 'Throne':
+        case 'Start':
+           $output .= $chat_line['text'];
+          break;
+      }
+      break;
+   
+  }
+//  return array(dgstats_secondsToTime($chat_line['time']/1000) . '|' ."{$chat_line['mode']}" . ': ' .$chat_line['player_name']. '->' .$chat_line['text']);
+  return array($output);
+}
+function dgstats_game_chat_get_playername($player_id,$players){
+  return $players[intval($player_id)]['name'];
+}
+function dgstats_secondsToTime($seconds)//Returns the time like 1:43:32
+{
+	$hours = floor($seconds/3600);
+	$secondsRemaining = $seconds % 3600;
+
+	$minutes = floor($secondsRemaining/60);
+	$seconds_left = $secondsRemaining % 60;
+
+	if($hours != 0)
+	{
+		if(strlen($minutes) == 1)
+		{
+		$minutes = "0".$minutes;
+		}
+		if(strlen($seconds_left) == 1)
+		{
+		$seconds_left = "0".$seconds_left;
+		}
+		return $hours.":".$minutes.":".$seconds_left;
+	}
+	else
+	{
+		if(strlen($seconds_left) == 1)
+		{
+		$seconds_left = "0".$seconds_left;
+		}
+		return $minutes.":".$seconds_left;
+	}
+}

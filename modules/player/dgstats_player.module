@@ -1,0 +1,1292 @@
+<?php
+/**
+ *  Drupal Ghost Stats: Player module
+ *
+ *  This modules contains most player related task.
+ *  Its part of the required modules.
+ *
+ *  Copyright (C) 2009 Oier Bravo Urtasun
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Affero General Public License as
+ *    published by the Free Software Foundation, either version 3 of the
+ *    License, or (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ *
+ */
+define('DGSTATS_PAGE_PLAYERS','players');
+function dgstats_player_menu(){
+  $items = array();
+  $items[DGSTATS_PAGE_PLAYERS] = array(
+    'title' => 'Players',
+    'page callback' => 'dgstats_players_page',
+    'access arguments' =>array('access ghost stats'),
+     'menu_name' => 'primary-links',
+  );
+    $items[DGSTATS_PAGE_PLAYERS . '/%player'] = array(
+    'title' => 'Players',
+    'page callback' => 'dgstats_player_page',
+    'page arguments' => array(1),
+    'access arguments' =>array('access ghost stats'),
+
+  );
+  $items[DGSTATS_PAGE_PLAYERS . '/search'] = array(
+    'title' => 'Player search result',
+    'page callback' => 'dgstats_players_page_search',
+    'access arguments' =>array('access ghost stats'),
+    'type' => MENU_CALLBACK,
+    // 'menu_name' => 'primary-links',
+  );
+  $items[DGSTATS_PAGE_PLAYERS . '/autocomplete'] = array(
+    'page callback' => 'dgstats_players_autocomplete_js',
+    'access arguments' =>array('access ghost stats'),
+    'type' => MENU_CALLBACK,
+    // 'menu_name' => 'primary-links',
+  );
+  return $items;
+}
+define('DGSTATS_BLOCK_PLAYER_SEARCH',0);
+
+function dgstats_players_page_search(){
+  $search_key = _dgstats_get_search_playername();
+  if(!$search_key){
+    
+    drupal_set_message('All players');
+    drupal_goto(DGSTATS_PAGE_PLAYERS);
+  } else {
+    $players = _dgstats_players_search($search_key);
+    $num_players = count($players);
+    if($num_players == 0){
+     
+      drupal_set_message('No player found.');
+      drupal_goto(DGSTATS_PAGE_PLAYERS);
+    } elseif($num_players == 1){
+      drupal_set_message('1 player found.');
+      $name = $players[0]['name'];
+      drupal_goto(DGSTATS_PAGE_PLAYERS . "/$name");
+    } elseif($num_players > 1){
+      $output = '';
+
+      $num_players = _dgstats_players_search($search_key,true);
+      drupal_set_message($num_players .' players found.');
+
+      $headers = _dgstats_get_table_header('players');
+      
+      $formated_players = dgstats_format_players_players($players);
+      $output .= theme('table',$headers,$formated_players);
+      $output .= theme('pager');
+      
+      return $output;
+    }
+
+  }
+
+}
+
+function dgstats_player_block($op='list', $delta=0, $edit=array()) {
+  switch ($op) {
+    case 'list':
+    $blocks[DGSTATS_BLOCK_PLAYER_SEARCH] = array(
+        'info'       => t('DGStats Player Search'),
+      );
+
+      return $blocks;
+    case 'view':
+      $block['subject'] = dgstats_player_block_subject($delta);
+      
+      $block['content'] = dgstats_player_block_content($delta);
+
+      return $block;
+
+    case 'configure':
+
+      $form = array();
+      return $form;
+    case 'save':
+
+      return;
+
+  }
+}
+
+function dgstats_player_block_content($delta){
+  switch ($delta) {
+        case DGSTATS_BLOCK_PLAYER_SEARCH:
+          return drupal_get_form('dgstats_player_search_form');
+          break;
+
+        default:
+          break;
+  }
+}
+function dgstats_player_block_subject($delta){
+ switch ($delta) {
+        case DGSTATS_BLOCK_PLAYER_SEARCH:
+          return t('Search a player');
+          break;
+
+        default:
+          break;
+  }
+}
+function dgstats_player_search_form(){
+  $form = array();
+  $playername = _dgstats_get_search_playername();
+  if(!$playername){
+    $playername = '';
+  }
+
+  $form['playerkey'] = array(
+    '#type' => 'textfield',
+    '#weight' => 1,
+    '#maxlength' => 18,
+    '#size' => 20,
+    '#autocomplete_path' => DGSTATS_PAGE_PLAYERS . '/autocomplete',
+    '#default_value' => $playername,
+  );
+  $form['submit'] = array(
+    '#name' => 'btn_search_player',
+    '#type' => 'submit',
+    '#value' => t('Search'),
+    '#weight' => 2,
+  );
+  return $form;
+
+}
+function dgstats_player_search_form_submit(&$form,&$form_state){
+  if(!isset($form_state['values']['playerkey'])){
+     drupal_goto(DGSTATS_PAGE_PLAYERS);
+  } else {
+    $search_key = check_plain($form_state['values']['playerkey']);
+  }
+  drupal_goto(DGSTATS_PAGE_PLAYERS . '/search',array('pkey'=> $search_key));
+}
+//function dgstats_format_player_item($item){
+//  if(strstr($item, 'I0')){
+//    return $item;
+//  } else {
+//    return 'X';
+//
+//  }
+//}
+function dgstats_player_page($player){
+  if(is_object($player)){
+    $player = (array) $player;
+  }
+  $breadcrumb = drupal_get_breadcrumb();
+  $breadcrumb[] = l(t('Players'),DGSTATS_PAGE_PLAYERS);
+  drupal_set_breadcrumb($breadcrumb);
+
+  $output = '';
+  drupal_set_title('Player: ' . $player['playername']);
+  
+  
+  $player_view = module_invoke_all('dgstatsplayer','view',$player);
+  $player_view['basic'] = array(
+        '#title' => 'Basic info',
+        '#output' => theme('player_resumen',$player),
+        '#weight' => 0,
+      );
+  uasort($player_view, 'element_sort');
+  $output .= theme('player',$player_view);
+  return $output;
+}
+function dgstats_player_dgstatstable(){
+  $headers = array();
+  $headers['players'] = array(
+    array('data' => 'Name','field' => 'playername','theme' => 'playername','theme arguments' => 'playername'),
+//    array('data' => 'Points','field' => 'points','sort'=>'desc','theme' => 'table_cell_numeric_round','theme arguments' => 'points'),
+//    array('data' => 'Points2','field' => 'points_sums','theme' => 'table_cell_numeric_round','theme arguments' => 'points_sums'),
+    array('data' =>'Games','field' =>'games' ),
+    array('data' => 'Wins','field' => 'wins'),
+    array('data' =>'Losses','field' => 'losses'),
+    //array('data' =>'Draws','field' => 'draws','theme' => 'table_cell_numeric_round','theme arguments' => 'points_sums'),
+    array('data' => 'Kills','field' => 'kills','theme' => 'table_cell_numeric_round','theme arguments' => 'kills'),
+    array('data' =>'Deaths','field' => 'deaths','theme' => 'table_cell_numeric_round','theme arguments' => 'deaths'),
+    array('data' => 'Assists','field' => 'assists','theme' => 'table_cell_numeric_round','theme arguments' => 'assists'),
+    array('data' =>'CK','field' => 'creepkills','theme' => 'table_cell_numeric_round','theme arguments' => 'creepkills'),
+    array('data' => 'CD', 'field' => 'creepdenies','theme' => 'table_cell_numeric_round','theme arguments' => 'creepdenies'),
+    array('data' => 'NK','field' => 'neutralkills','theme' => 'table_cell_numeric_round','theme arguments' => 'neutralkills'),
+    array('data' => 'TK','field' => 'towerkills','theme' => 'table_cell_numeric_round','theme arguments' => 'towerkills'),
+  );
+
+ 
+  $headers['player_resumen'] = array(
+    array('data' => 'Games','theme' => 'table_cell_no_theme','theme arguments' => 'games'),
+    array('data' => 'Points','theme' => 'table_cell_numeric_round','theme arguments' => 'points'),
+    array('data' => 'Wins'),
+    array('data' => 'Losses'),
+    array('data' => 'Draws',),
+    array('data' => 'Kills','theme' => 'table_cell_numeric_round','theme arguments' => 'kills'),
+    array('data' => 'Deaths','theme' => 'table_cell_numeric_round','theme arguments' => 'deaths'),
+    array('data' => 'Assists','theme' => 'table_cell_numeric_round','theme arguments' => 'assists'),
+
+  );
+  return $headers;
+}
+//function dgstats_format_player_player($player){
+//  $medias = dgstats_get_player_medias($player);
+//  $mkill = $medias['kills'];
+//  $mdeaths = $medias['deaths'];
+//  $massists = $medias['assists'];
+//
+//  $percents = dgstats_get_player_percents($player);
+//  $pwins = $percents['wins'];
+//  $plosses = $percents['losses'];
+//  $pdraws = $percents['draws'];
+//
+//  $formated_player = array();
+//  $formated_player[] = $player['games'];
+//  $formated_player[] = round($player['points'],2);
+//  $formated_player[] = $player['wins'] . " ($pwins%)";
+//  $formated_player[] = $player['losses'] . " ($plosses%)";
+//  $formated_player[] = $player['draws'] . " ($pdraws%)";
+//
+//  $formated_player[] = round($player['kills'],2) . " ($mkill)";
+//  $formated_player[] = round($player['deaths'],2) . " ($mdeaths)";
+//  $formated_player[] = round($player['assists'],2) . " ($massists)";
+//
+//  return array($formated_player);
+//}
+//function dgstats_format_player_games($games){
+//
+//  $formated_games = array();
+//  foreach($games as $game){
+//    $row = array();
+//
+//    $row['datetime'] = $game['datetime'] ;
+//    $row[] = theme('gamename',$game['gamename'], $game['id']);
+//    $row[] = theme('time_seconds',$game['duration']);
+//    $row[] = theme('team',$game['team'],'table') ;
+//    $row[] = theme('hero',$game['hero']) ;
+//    $row[] = $game['kills'] ;
+//    $row[] = $game['deaths'] ;
+//    $row[] = $game['assists'] ;
+//    $row[] = theme('gameresult',$game['result']);
+//
+//    if($game['winner'] -1 == $game['team']){
+//      $gameresult = 1;
+//    } elseif( $game['winner'] == 0 ){
+//
+//      $gameresult = 3;
+//    } else {
+//           $gameresult = 0;
+//    }
+//
+//    $formated_games[] = $row;
+//  }
+//
+//  return $formated_games;
+//}
+function player_load($playername){
+  if(!is_string($playername)){
+    return false;
+  }
+  $sql = "SELECT * from {dgstats_player} where playername = '%s'";
+  $player = db_fetch_object(db_query($sql,$playername));
+  if(!$player)
+    return false;
+  $additions = module_invoke_all('dgstats_player_load',$player);
+  foreach($additions as $key => $val){
+    $player->$key = $val;
+  }
+
+  drupal_alter('dgstats_player',$player);
+  
+  return $player;
+}
+function player_load_deprecated($playername){
+  if(!is_string($playername)){
+    return false;
+  }
+
+  $username = $playername;
+//  $sql = "SELECT *,
+//    (
+//      ((ps.wins-ps.losses)/ps.games)+
+//      (ps.kills-ps.deaths+ps.assists/2)+
+//      (ps.creepkills/100+ps.creepdenies/10+ps.neutralkills/50)+
+//      (ps.raxkills/6)+(ps.towerkills/11)
+//      ) as points,
+//      (((ps.wins-ps.losses)/ps.games)+
+//      (ps.sumkills-ps.sumdeaths+ps.sumassists/2)+
+//      (ps.sumcreepkills/100+ps.sumcreepdenies/10+ps.sumneutralkills/50)+
+//      (ps.sumraxkills/6)+(ps.sumtowerkills/11)
+//      ) as points_sums,
+//    ps.sumkills / ps.sumdeaths as ratiokilldeath,
+//    ps.wins / ps.losses as ratiowinlosse
+//    from (SELECT COUNT(a.id) as games,
+//    AVG(kills) as kills,
+//    AVG(deaths) as deaths,
+//    AVG(assists) as assists,
+//    AVG(creepkills) as creepkills,
+//    AVG(creepdenies) as creepdenies,
+//    AVG(neutralkills) as neutralkills,
+//    AVG(towerkills) as towerkills,
+//    AVG(raxkills) as raxkills,
+//    AVG(courierkills) as courierkills,
+//    name,
+//
+//    SUM(kills) as sumkills,
+//    SUM(deaths) as sumdeaths,
+//    SUM(assists) as sumassists,
+//
+//
+//    SUM(creepkills) as sumcreepkills,
+//    SUM(creepdenies) as sumcreepdenies,
+//    SUM(neutralkills) as sumneutralkills,
+//    SUM(towerkills) as sumtowerkills,
+//    SUM(raxkills) as sumraxkills,
+//    SUM(courierkills) as sumcourierkills,
+//
+//
+//
+//    count(if(((c.winner = 1 and a.colour < 6) or (c.winner = 2 and a.colour > 6)),1,NULL)) as wins,
+//    count(if(((c.winner = 1 and a.colour > 6) or (c.winner = 2 and a.colour < 6)),1,NULL)) as losses,
+//    count(if(((c.winner = 0)),1,NULL)) as draws
+//
+//
+//
+//    FROM dotaplayers AS a
+//    LEFT JOIN gameplayers AS b ON b.gameid = a.gameid and a.colour = b.colour
+//    LEFT JOIN dotagames AS c ON c.gameid = a.gameid
+//    LEFT JOIN games as d ON d.id = c.gameid where name= '$username' group by name) as ps";
+  $database_extra = module_invoke_all('dgstatsplayer','database',$player);
+
+    $columns = array();
+    $joins = array();
+    foreach($database_extra as $key => $extra){
+      $columns[] = ',' . implode(',',$extra['columns']);
+      $joins[] = 'LEFT JOIN {' . $extra['tablename'] . '} AS ' . $extra['as'] . ' ON ' .  $extra['on'];
+    }
+    $columns_str = implode(' ' ,$columns);
+    $joins_str = implode(' ' ,$joins);
+    $sql = "SELECT COUNT(a.id) as games,
+    AVG(kills) as kills,
+    AVG(deaths) as deaths,
+    AVG(assists) as assists,
+    AVG(creepkills) as creepkills,
+    AVG(creepdenies) as creepdenies,
+    AVG(neutralkills) as neutralkills,
+    AVG(towerkills) as towerkills,
+    AVG(raxkills) as raxkills,
+    AVG(courierkills) as courierkills,
+    b.name,
+
+    SUM(kills) as sumkills,
+    SUM(deaths) as sumdeaths,
+    SUM(assists) as sumassists,
+
+
+    SUM(creepkills) as sumcreepkills,
+    SUM(creepdenies) as sumcreepdenies,
+    SUM(neutralkills) as sumneutralkills,
+    SUM(towerkills) as sumtowerkills,
+    SUM(raxkills) as sumraxkills,
+    SUM(courierkills) as sumcourierkills,
+
+
+
+    count(if(((c.winner = 1 and a.colour < 6) or (c.winner = 2 and a.colour > 6)),1,NULL)) as wins,
+    count(if(((c.winner = 1 and a.colour > 6) or (c.winner = 2 and a.colour < 6)),1,NULL)) as losses,
+    count(if(((c.winner = 0)),1,NULL)) as draws
+
+    $columns_str
+
+    FROM {dotaplayers} AS a
+   
+    LEFT JOIN {gameplayers} AS b ON b.gameid = a.gameid and a.colour = b.colour
+    LEFT JOIN {dotagames} AS c ON c.gameid = a.gameid
+    LEFT JOIN {games} as d ON d.id = c.gameid
+    $joins_str 
+    WHERE b.name= '$username' group by b.name";
+
+
+  $player = db_fetch_array(db_query($sql));
+
+
+  $extra = module_invoke_all('dgstatsplayer','load',$player);
+  foreach($extra as $key => $val){
+    $player[$key] = $val;
+  }
+
+  return $player;
+}
+function dgstats_get_player_history($playername){
+
+  $sql = "SELECT winner,
+   a.gameid as id,
+   newcolour,
+   datetime,
+   gamename,
+   hero,
+   team,
+   kills,
+   deaths,
+   assists,
+   creepkills, creepdenies, neutralkills,towerkills,raxkills,
+   name,
+   d.duration,
+   CASE when(gamestate = '17') then 'PRIV' else 'PUB' end as type,
+   CASE WHEN (deaths = 0 and kills = 0) THEN 0 WHEN (deaths = 0) then 1000 ELSE (kills*1.0/deaths) end as kdratio,
+   CASE when (winner=1 and newcolour < 6) or (winner=2 and newcolour > 6) then 'WON' when  winner=0 then 'DRAW' else 'LOST' end as result
+
+  FROM dotaplayers AS a LEFT JOIN gameplayers AS b ON b.gameid = a.gameid and a.colour = b.colour
+  LEFT JOIN dotagames AS c ON c.gameid = a.gameid
+  LEFT JOIN games AS d ON d.id = a.gameid where name= '$playername' ORDER BY d.datetime DESC";
+  $result = db_query($sql);
+  $games = array();
+  while($row = db_fetch_array($result)){
+    $games[] = $row;
+  }
+
+  return $games;
+}
+function dgstats_player_get_evolution($games_history){
+
+  $num_games = count($games_history);
+  $evolution = array();
+  $data['sumwins'] = 0;
+  $data['sumlosses'] = 0;
+  $data['sumkills'] = 0;
+  $data['sumdeaths'] = 0;
+  $data['sumassists'] =0;
+
+  $data['sumcreepkills'] =0;
+  $data['sumcreepdenies'] = 0;
+  $data['sumneutralkills'] = 0;
+  $data['sumtowerkills'] = 0;
+  $data['sumraxkills']= 0;
+
+  for($i = 0; $i < $num_games; $i++){
+
+      $data['sumgames'] =$i+1;
+   /*  switch($games_history[$i-1]['result']){
+        case 'WON':
+          $data['sumwins'] += 1;
+          break;
+        case 'LOST':
+          $data['sumlosses'] += 1;
+          break;
+        default:
+          break;
+      }*;
+    *
+    */
+    if($games_history[$i]['result'] == 'WON'){
+      $data['sumwins']++;
+    } elseif($games_history[$i]['result'] == 'LOST'){
+      $data['sumlosses']++;
+    } else {
+
+    }
+
+    $data['sumkills'] += $games_history[$i]['kills'];
+    $data['sumdeaths'] += $games_history[$i]['deaths'];
+    $data['sumassists'] += $games_history[$i]['assists'];
+
+    $data['sumcreepkills'] += $games_history[$i]['creepkills'];
+    $data['sumcreepdenies'] += $games_history[$i]['creepdenies'];
+    $data['sumneutralkills'] += $games_history[$i]['neutralkills'];
+    $data['sumtowerkills'] += $games_history[$i]['towerkills'];
+    $data['sumraxkills'] += $games_history[$i]['raxkills'];
+
+
+     $data['avgkills'] = $data['sumkills']/$data['sumgames'];
+    $data['avgdeaths'] = $data['sumdeaths']/$data['sumgames'];
+    $data['avgassists'] = $data['sumassists']/$data['sumgames'];
+
+    $data['avgcreepkills'] = $data['sumcreepkills']/$data['sumgames'];
+    $data['avgcreepdenies'] = $data['sumcreepdenies']/$data['sumgames'];
+    $data['avgneutralkills'] = $data['sumneutralkills']/$data['sumgames'];
+    $data['avgtowerkills'] = $data['sumtowerkills']/$data['sumgames'];
+    $data['avgraxkills'] = $data['sumraxkills']/$data['sumgames'];
+
+    $points =
+      (($data['sumwins'] - $data['sumlosses'])/ $data['sumgames'])+
+      ($data['avgkills'] - $data['avgdeaths'] + $data['avgassists'] /2)+
+      ( $data['avgcreepkills']/100+ $data['avgcreepdenies']/10+ $data['avgneutralkills']/50)+
+      ($data['avgraxkills']/6)+( $data['avgtowerkills']/11);
+//((ps.wins-ps.losses)/ps.games)+
+//    (ps.kills-ps.deaths+ps.assists/2)+
+//    (ps.creepkills/100+ps.creepdenies/10+ps.neutralkills/50)+
+//    (ps.raxkills/6)+(ps.towerkills/11)
+//    ) as points,
+//((27-43)/85)+(2.4-5.4+5.8/2)+(59.3/100 + 2.2/10 + 5.4/50)+0.1/6 + 0.7/11 =
+    $data['points'] = round($points,2);
+    $evolution[] = $data;
+  }
+  
+  $evolution = array_reverse($evolution);
+  $eevolution = array_slice($evolution, 0,90);
+//  dpm($eevolution);
+
+  return $eevolution;
+}
+function dgstats_player_dgstats_player(&$player){
+  return array('lastgame'=>dgstats_get_player_lastgame($player));
+}
+
+function dgstats_get_player_lastgame(&$player){
+ 
+  $sql = "select * from games AS g
+    JOIN gameplayers AS gp ON g.id = gp.gameid
+    JOIN dotagames AS dg ON dg.gameid = g.id
+    WHERE gp.name = '%s'
+    ORDER BY datetime DESC";
+
+  $result = db_query($sql,$player['name']);
+
+  $lastgame_db = db_fetch_array($result);
+ 
+  $lastgame['datetime'] = $lastgame_db['datetime'];
+  $lastgame['team'] = $lastgame_db['team'];
+
+  $lastgame['duration'] = $lastgame_db['min'] . ":" . $lastgame_db['sec'];
+
+  if($lastgame_db['team'] == 0 && $lastgame_db['winner'] == 1){
+    $lastgame['result'] = 'WON';
+  } elseif($lastgame_db['team'] == 0 && $lastgame_db['winner'] == 2)  {
+    $lastgame['result'] = 'LOST';
+  } else if($lastgame_db['team'] == 1 && $lastgame_db['winner'] == 2){
+    $lastgame['result'] = 'WON';
+  } else if($lastgame_db['team'] == 1 && $lastgame_db['winner'] == 1) {
+    $lastgame['result'] = 'LOST';
+  } else {
+    $lastgame['result'] = 'DRAW';
+  }
+
+  $player['lastgame'] = $lastgame;
+  return $lastgame;
+}
+//function dgstats_format_players_player($player){
+//  $formated_player = array(
+//   l($player['name'],'stats/players/' . $player['name']) ,
+//  );
+//}
+
+function theme_player_resumen($player){
+  $output = '';
+ dpm($player);
+  $output .= theme('dgstats_table','player_resumen', array($player));
+  return $output;
+}
+
+function theme_player_points($points){
+  $output = '';
+  $output .= round($points,2);
+  return $output;
+}
+
+function theme_playername($playername){
+//   if(is_array($playername)){
+//     if(isset($playername['creatorname'])){
+//       $playername = $playername['creatorname'];
+//     } else {
+//       $playername = $playername['name'];
+//     }
+//
+//   }
+   $output = '';
+   if(!dgstats_verify_ban($playername)){
+     $uid = dgstats_player_get_uid_by_playername($playername);
+     if($uid != 0){
+      $output .= l($playername, 'user/' . $uid) ;
+     } else {
+
+        $output .= l($playername, DGSTATS_PAGE_PLAYERS . '/' . $playername) ;
+     }
+   } else {
+     $output = '<span class="banned-player">' . $playername. '</span>';
+   }
+   return $output;
+}
+
+function dgstats_get_player_medias($player){
+  $games = $player['games'];
+
+  $medias['kills'] = round($player['kills']/$player['games']);
+  $medias['deaths'] = round($player['deaths']/$player['games']);
+  $medias['assists'] = round($player['assists']/$player['games']);
+
+  return $medias;
+}
+
+function dgstats_get_player_percents($player){
+  $games = $player['games'];
+
+  $percents['wins'] = round($player['wins']/$player['games']*100);
+  $percents['losses'] = round($player['losses']/$player['games']*100);
+  $percents['draws'] = round($player['draws']/$player['games']*100);
+
+  return $percents;
+}
+function dgstats_player_theme(){
+  return array(
+    'player_resumen' => array(
+      'arguments' => array('player' => null),
+    ),
+
+    'playername' => array(
+      'arguments' => array('playername' => null,'id'=> null),
+    ),
+ 
+    'player_points' => array(
+      'arguments' => array('points' => null,'delta' => null),
+    ),
+    'player' => array(
+      'template' => 'player',
+      'arguments' => array('player' => null),
+    ),
+
+  );
+}
+function dgstats_get_players(){
+  $mingames = variable_get('dgstats_config_listmingames', 4);
+  $sql = "select playername from {dgstats_player} where games > $mingames";
+   $order = _dgstats_get_order_str('players');
+
+  $sql .= $order;
+  $result = pager_query($sql,20,0);
+  $players = array();
+  while($playername = db_result($result)){
+    $players[] = player_load($playername);
+  }
+  return $players;
+
+}
+function dgstats_get_players_deprecated(){
+  $mingames = variable_get('dgstats_config_listmingames', 4);
+  $count_sql = "SELECT count(*)
+    from (SELECT COUNT(a.id) as games,
+      name,
+    count(if(((c.winner = 1 and a.colour < 6) or (c.winner = 2 and a.colour > 6)),1,NULL)) as wins,
+    count(if(((c.winner = 1 and a.colour > 6) or (c.winner = 2 and a.colour < 6)),1,NULL)) as losses,
+    count(if(((c.winner = 0)),1,NULL)) as draws
+
+    FROM {dotaplayers} AS a
+    LEFT JOIN {gameplayers} AS b ON b.gameid = a.gameid and a.colour = b.colour
+    LEFT JOIN {dotagames} AS c ON c.gameid = a.gameid
+    LEFT JOIN {games} as d ON d.id = c.gameid where name <> '' group by name) as ps where ps.games >= $mingames";
+
+
+  $sql = "SELECT *,
+    (
+      ((ps.wins-ps.losses)/ps.games)+
+      (ps.kills-ps.deaths+ps.assists/2)+
+      (ps.creepkills/100+ps.creepdenies/10+ps.neutralkills/50)+
+      (ps.raxkills/6)+(ps.towerkills/11)
+      ) as points,
+      (((ps.wins-ps.losses)/ps.games)+
+      (ps.sumkills-ps.sumdeaths+ps.sumassists/2)+
+      (ps.sumcreepkills/100+ps.sumcreepdenies/10+ps.sumneutralkills/50)+
+      (ps.sumraxkills/6)+(ps.sumtowerkills/11)
+      ) as points_sums,
+    ps.sumkills / ps.sumdeaths as ratiokilldeath,
+    ps.wins / ps.losses as ratiowinlosse
+    from (SELECT COUNT(a.id) as games,
+    AVG(kills) as kills,
+    AVG(deaths) as deaths,
+    AVG(assists) as assists,
+    AVG(creepkills) as creepkills,
+    AVG(creepdenies) as creepdenies,
+    AVG(neutralkills) as neutralkills,
+    AVG(towerkills) as towerkills,
+    AVG(raxkills) as raxkills,
+    AVG(courierkills) as courierkills,
+    name,
+
+    SUM(kills) as sumkills,
+    SUM(deaths) as sumdeaths,
+    SUM(assists) as sumassists,
+
+
+    SUM(creepkills) as sumcreepkills,
+    SUM(creepdenies) as sumcreepdenies,
+    SUM(neutralkills) as sumneutralkills,
+    SUM(towerkills) as sumtowerkills,
+    SUM(raxkills) as sumraxkills,
+    SUM(courierkills) as sumcourierkills,
+
+
+
+    count(if(((c.winner = 1 and a.colour < 6) or (c.winner = 2 and a.colour > 6)),1,NULL)) as wins,
+    count(if(((c.winner = 1 and a.colour > 6) or (c.winner = 2 and a.colour < 6)),1,NULL)) as losses,
+    count(if(((c.winner = 0)),1,NULL)) as draws
+
+
+
+    FROM {dotaplayers} AS a
+    LEFT JOIN {gameplayers} AS b ON b.gameid = a.gameid and a.colour = b.colour
+    LEFT JOIN {dotagames} AS c ON c.gameid = a.gameid
+    LEFT JOIN {games} as d ON d.id = c.gameid where name <> '' group by name) as ps where ps.games  >= $mingames
+  ";
+
+  $order = _dgstats_get_order_str('players');
+
+  $sql .= $order;
+
+  $result = pager_query($sql,20,0, $count_sql);
+
+  while($row = db_fetch_array($result)){
+      $players_raw[] = $row;
+    }
+
+  return $players_raw;
+
+}
+function dgstats_get_players_lite(){
+
+  $sql = "SELECT * FROM {scores}";
+
+  $result = pager_query($sql,20,0);
+  $players = array();
+  while($row = db_fetch_array($result)){
+    dpm($row);
+    $players[] = player_load($row['name']);
+  }
+  dpm($players);
+  return $players;
+}
+function dgstats_players_page(){
+  $output = '';
+//  drupal_set_message('Cambios en esta seccion. ' . l('Mas info.','node'));
+  $headers = _dgstats_get_table_header('players');
+
+  //$players = dgstats_get_players();
+
+  $players = dgstats_get_players();
+
+  $mingames =  variable_get('dgstats_config_listmingames',4);
+  $output .= $mingames . ' games minimum to be in the list.';
+  $output .= theme('dgstats_table','players',$players);
+  $output .= theme('pager');
+
+  return $output;
+}
+//function dgstats_format_players_players($players){
+//  $formated_players = array();
+//  foreach($players as $player){
+//    $row  = array();
+//    $row[] = theme_playername($player['name']);
+//    $row[] = theme('player_points',$player['points']);
+//    $row[] = theme('player_points',$player['points_sums']);
+//    $row[] = $player['games'];
+//    $row[] = $player['wins'];
+//    $row[] = $player['losses'];
+//    $row[] = $player['draws'];
+//    $row[] = round($player['kills'],1);
+//    $row[] = round($player['deaths'],1);
+//    $row[] = round($player['assists'],1);
+//    $row[] = round($player['creepkills'],1);
+//    $row[] = round( $player['creepdenies'],1);
+//    $row[] = round($player['neutralkills'],1);
+//    $row[] = round($player['towerkills'],1);
+//    $formated_players[] = $row;
+//  }
+//  return $formated_players;
+//}
+
+function _dgstats_get_search_playername(){
+  if(isset($_REQUEST['pkey'])){
+    $playername = check_plain($_REQUEST['pkey']);
+    return $playername;
+  } else {
+    return false;
+  }
+}
+
+function _dgstats_players_search($key,$only_count = false){
+  $count_sql = "SELECT count(*) as count
+  from (SELECT COUNT(a.id) as games,
+    name,
+  count(if(((c.winner = 1 and a.colour < 6) or (c.winner = 2 and a.colour > 6)),1,NULL)) as wins,
+  count(if(((c.winner = 1 and a.colour > 6) or (c.winner = 2 and a.colour < 6)),1,NULL)) as losses,
+  count(if(((c.winner = 0)),1,NULL)) as draws
+
+  FROM {dotaplayers} AS a
+  LEFT JOIN {gameplayers} AS b ON b.gameid = a.gameid and a.colour = b.colour
+  LEFT JOIN {dotagames} AS c ON c.gameid = a.gameid
+  LEFT JOIN {games} as d ON d.id = c.gameid where name <> '' and name like '%$key%' group by name) as ps";
+  if($only_count){
+    $result = db_query($count_sql);
+    $output = db_fetch_array($result);
+    
+    return $output['count'];
+
+  }
+
+  $sql = "SELECT *,
+    (
+      ((ps.wins-ps.losses)/ps.games)+
+      (ps.kills-ps.deaths+ps.assists/2)+
+      (ps.creepkills/100+ps.creepdenies/10+ps.neutralkills/50)+
+      (ps.raxkills/6)+(ps.towerkills/11)
+      ) as points,
+    ps.sumkills / ps.sumdeaths as ratiokilldeath,
+    ps.wins / ps.losses as ratiowinlosse
+    from (SELECT COUNT(a.id) as games,
+    AVG(kills) as kills,
+    AVG(deaths) as deaths,
+    AVG(assists) as assists,
+    AVG(creepkills) as creepkills,
+    AVG(creepdenies) as creepdenies,
+    AVG(neutralkills) as neutralkills,
+    AVG(towerkills) as towerkills,
+    AVG(raxkills) as raxkills,
+    AVG(courierkills) as courierkills,
+    name,
+
+    SUM(kills) as sumkills,
+    SUM(deaths) as sumdeaths,
+    SUM(assists) as sumassists,
+
+
+    SUM(creepkills) as sumcreepkills,
+    SUM(creepdenies) as sumcreepdenies,
+    SUM(neutralkills) as sumneutralkills,
+    SUM(towerkills) as sumtowerkills,
+    SUM(raxkills) as sumraxkills,
+    SUM(courierkills) as sumcourierkills,
+
+
+
+    count(if(((c.winner = 1 and a.colour < 6) or (c.winner = 2 and a.colour > 6)),1,NULL)) as wins,
+    count(if(((c.winner = 1 and a.colour > 6) or (c.winner = 2 and a.colour < 6)),1,NULL)) as losses,
+    count(if(((c.winner = 0)),1,NULL)) as draws
+
+
+
+    FROM {dotaplayers} AS a
+    LEFT JOIN {gameplayers} AS b ON b.gameid = a.gameid and a.colour = b.colour
+    LEFT JOIN {dotagames} AS c ON c.gameid = a.gameid
+    LEFT JOIN {games} as d ON d.id = c.gameid where name <> '' and name like '%$key%' group by name) as ps
+  ";
+
+  $order = _dgstats_get_order_str('players');
+
+  $sql .= $order;
+
+  $result = pager_query($sql,10,0, $count_sql);
+
+  while($row = db_fetch_array($result)){
+    $players_raw[] = $row;
+  }
+
+return $players_raw;
+}
+
+
+function _dgstats_get_total_players(){
+  
+  $sql = "select count(*) as numplayers from (select * from gameplayers where name <> '' group by name) as tot";
+
+  $result = db_query($sql);
+  $row = db_fetch_array($result);
+  $players = $row['numplayers'];
+  return $players;
+}
+
+function dgstats_player_dgstats_server(){
+  $serverstats = array();
+  $serverstats['players'] = array(
+    'label' => 'Total players',
+    'data' =>  _dgstats_get_total_players()
+  );
+  return $serverstats;
+}
+function dgstats_player_dgstatsconfig($op){
+  switch($op){
+    case 'form':
+      $form = array();
+
+      $form['playerconfig'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Player config'),
+        '#weight' => 0,
+        '#collapsible' => TRUE,
+        '#collapsed' => FALSE,
+      );
+      $form['playerconfig']['listmingames'] = array(
+        '#type' => 'textfield',
+        '#title' => 'Min games',
+        '#size' => 5,
+        '#default_value' => variable_get('dgstats_config_listmingames',4),
+        '#description' => t('Minimum games to appear in the "players" page.')
+      );
+
+
+      return $form;
+    case 'validate':
+      return array('dgstats_playerconfig_validate');
+      break;
+    case 'submit':
+      return array('dgstats_playerconfig_submit');
+      break;
+
+  }
+}
+function dgstats_playerconfig_validate($form_id,&$form_state){
+//  dpm('validando playerconfig');
+//  dpm($form_state['values']);
+  $mingames = $form_state['values']['listmingames'];
+  if(!is_numeric($mingames)){
+    return form_set_error('listmingames', t('Only numbers.'));
+  }
+}
+function dgstats_playerconfig_submit($form_id,&$form_state){
+  $mingames = $form_state['values']['listmingames'];
+  variable_set('dgstats_config_listmingames', $mingames);
+}
+
+function dgstats_players_autocomplete_js($string){
+  $sql = "SELECT name from gameplayers WHERE LOWER(name) LIKE LOWER('%%%s%%')";
+  $result = db_query_range($sql, $string, 0, 10);
+  $matches = array();
+  while($row = db_fetch_array($result)){
+    $matches[$row['name']] = check_plain(trim($row['name']));
+  }
+  print drupal_to_js($matches);
+  exit();
+}
+function dgstats_get_game_players($gameid,$raw = false){
+ 'SELECT * FROM {gameplayers} gp INNER JOIN {dotaplayers} dp WHERE gp.id = dp.id AND gp.gameid = %d';
+
+  $sql = "select 
+        dp.gameid as gameid,
+        gp.name as playername,
+        loadingtime,
+        `left`,
+        leftreason,
+        team,
+        dp.colour as colour,
+        dp.botid as botid,
+        kills,
+        deaths,
+        assists,
+        creepkills,
+        creepdenies,
+        neutralkills,
+        item1,
+        item2,
+        item3,
+        item4,
+        item5,
+        item6,
+        hero,
+        towerkills,
+        raxkills,
+        courierkills,
+        gold
+
+  from {dotaplayers} AS dp
+  LEFT JOIN {gameplayers} as gp ON gp.gameid = dp.gameid and gp.colour = dp.colour
+  where dp.gameid = %s AND gp.name <> ''";
+
+if(!$raw){
+$order_str = _dgstats_get_order_str('game_players');
+ $sql .= $order_str;
+}
+
+
+  $result = db_query($sql,$gameid);
+
+  $players = array();
+  while($row = db_fetch_array($result)){
+    if($row['playername'])
+    $players[] = $row;
+
+  }
+//
+  return $players;
+}
+function dgstats_player_dgstatsgame($op,$game){
+  switch($op){
+    case 'load':
+
+      return array('players' => dgstats_get_game_players($game['id']));
+      break;
+    case 'view':
+
+
+       return array(
+        'players' => array(
+          '#title' => 'Players',
+          '#output' => theme('dgstats_table','game_players',$game['players']),
+          '#weight' => 2,
+        ),
+      );
+      break;
+  }
+}
+//function dgstats_user($op, &$edit, &$account, $category = NULL){
+//    switch($op){
+//
+//    }
+//}
+//function dgstats_player_user_form(){
+//
+//}
+function dgstats_player_dgstats_game_process($node){
+//  print_r($node);
+  $gameid = $node->gameid;
+  $game_players = dgstats_get_game_players($gameid,true);
+  foreach($game_players as $player){
+    if($node->winner == 1 && $player['color'] < 6){
+      $player['result'] = 1;
+    } elseif ($node->winner == 2 && $player['color'] > 6) {
+       $player['result'] = 1;
+    } else {
+      $player['result'] = 0;
+    }
+//    dpm($player);
+//    $player['timestamp'] = strtotime($node->datetime);
+    $player['datetime'] = $node->datetime;
+    dgstats_player_process_player_game($player);
+  }
+  
+
+}
+function dgstats_player_process_player_game($playergame){
+//  print_r($playergame);
+  $player = _player_load($playergame['playername']);
+//  print_r($player);
+  if($playergame['result'] == 1){
+    $player->wins += 1;
+//    $player->losses = 0;
+  } else {
+//    $player->wins = 0;
+    $player->losses += 1;
+  }
+  $player->games += 1;
+  foreach($playergame as $key => $val){
+    $kill_keys = _dgstats_player_get_kill_keys();
+    if(in_array($key, $kill_keys)){
+      $sumkey = 'sum' . $key;
+      $player->$sumkey += $val;
+      $kill_system = dgstats_player_get_kill_system();
+      if($kill_system == 'sum'){
+        $player->$key = $player->$sumkey;
+      }else if($kill_system == 'avg'){
+        $player->$key = $player->$sumkey / $player->games;
+      }
+    } else {
+      $player->$key = $val;
+    }
+
+  }
+  $player->points = dgstats_player_points_calculate($player);
+  
+  player_save($player);
+  $player->gameid = $playergame['gameid'];
+  player_save_evolution($player);
+
+
+
+
+
+}
+function _dgstats_player_get_kill_keys(){
+  return array('kills','deaths','assists','creepkills','creepdenies','towerkills','raxkills','neutralkills');
+}
+function player_save($player){
+  if(is_array($player)){
+    $player = (object) $player;
+    $array = true;
+  } else {
+    $array = false;
+  }
+
+  if($player->is_new){
+    drupal_write_record('dgstats_player',$player);
+  } else {
+    drupal_write_record('dgstats_player',$player,array('playername'));
+  }
+  module_invoke_all('dgstats_player_save',$player);
+
+  if($array){
+    return (array) $player;
+  } else {
+    return $player;
+  }
+
+}
+function player_save_evolution($player){
+//  if(!isset($player->timestamp)){
+    $player->timestamp = strtotime($player->datetime);
+//  }
+  drupal_write_record('dgstats_player_evolution',$player);
+  module_invoke_all('dgstats_player_save_evolution',$player);
+}
+function _player_load($playername){
+  if(!$playername)
+    return false;
+  if(!is_string($playername))
+    return false;
+  if(empty($playername))
+    return false;
+
+  $sql = "select * from {dgstats_player} where playername = '%s'";
+  $player = db_fetch_object(db_query($sql,$playername));
+
+  $additions = module_invoke_all('dgstats_player_load',$player);
+  foreach($additions as $key => $val){
+    $player->$key = $val;
+  }
+
+  if($player){
+    drupal_alter('dgstats_player_load',$player);
+    return $player;
+  } else {
+    return _dgstats_player_default_player($playername);
+  }
+}
+function _dgstats_player_default_player($playername){
+  $player = new stdClass();
+  $schema = drupal_get_schema('dgstats_player');
+  foreach($schema['fields'] as $key => $field){
+    $player->$key = $field['default'];
+  }
+  $player->playername = $playername;
+  $player->is_new = true;
+  return $player;
+}
+
+function dgstats_player_average_or_sum(){
+  return variable_get('dgstats_player_average',true);
+}
+function dgstats_player_points_calculate($player){
+if(is_object($player)){
+  $object = true;
+  $player = (array) $player;
+} else {
+  $object = false;
+}
+    //Metodo por ahora ideal ya que permite en un futuro cambiar facilmente la formula con el UI
+// $formula = '( wins - losses )/ games  +  kills - deaths + assists /2 +  creepkills /100+ creepdenies /10+ neutralkills /50 +  raxkills /6+ towerkills /11';
+// dpm($player);
+    $formula = '( wins - losses )/ games  +  kills - deaths + assists /2 +  creepkills /100+ creepdenies /10+ neutralkills /50 +  raxkills /6+ towerkills /11';
+      $keywords = dgstats_points_keywords();
+  foreach($keywords as $word){
+    $formula = str_replace(" $word ", $player[$word], $formula);
+  }
+
+
+  $points =floatval($formula);
+// Segunda opcion para calcular sacando las variables.
+//  extract($player, EXTR_SKIP);
+//  $formula = "(( $wins - $losses )/ $games ) + ( $kills - $deaths + $assists /2) + ( $creepkills /100+ $creepdenies /10+ $neutralkills /50) + ( $raxkills /6)+( $towerkills /11)";
+
+//    dpm($formula);
+//  eval("\$points=" .  $formula . ";");
+  eval("\$points=$formula;");
+  return $points;
+}
+function dgstats_player_points_keywords(){
+  return array(
+    'wins',
+    'losses',
+    'games',
+    'kills',
+    'deaths',
+    'assists',
+    'creepkills',
+    'creepdenies',
+    'neutralkills',
+    'raxkills',
+    'towerkills',
+    'points',
+  );
+}
+function dgstats_player_get_kill_system(){
+  return variable_get('dgstats_player_kill_system','avg');
+}
+function dgstats_player_dgstats_process_all_games(){
+  $sql = "TRUNCATE TABLE {dgstats_player}";
+  db_query($sql);
+  $sql = "TRUNCATE TABLE {dgstats_player_evolution}";
+  db_query($sql);
+}
+
+function dgstats_player_user($op, &$edit, &$account, $category = NULL){
+    if ($op == 'form' && $category == 'account') {
+         $form['dgstats_setting'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Bot setting'),
+      '#collapsible' => TRUE,
+      '#weight' => -10);
+    $form['dgstats_setting']['playername'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Eurobattle.net user name'),
+      '#default_value' => $edit['playername'],
+      '#description' => t('Your user name to track stats.'));
+//    dpm($edit);
+//    dpm($account);
+    return $form;
+
+    }
+    if($op == 'insert'){
+      if($edit['playername'] != '')
+        dgstats_player_set_uid($edit['playername'],$account->uid);
+      $edit['playername'] = NULL;
+    }
+    if($op == 'update'){
+      if($edit['playername'] != '')
+        dgstats_player_set_uid($edit['playername'],$account->uid);
+      $edit['playername'] = NULL;
+    }
+    if($op == 'validate'){
+      $playername_ok = dgstats_player_verify_playername($edit['playername']);
+      if(!$playername_ok){
+        return form_set_error('playername', t('This player has never played in this bot.'));
+      }
+    }
+    if($op == 'load'){
+      $account->playername = dgstats_player_get_playername_by_uid($account->uid);
+      $account->player = player_load( $account->playername);
+    }
+    if($op == 'view'){
+      $account->content['dgstats_player'] = array(
+              '#value' => dgstats_player_page($account->player),
+              '#weight' => 0,
+        );
+    }
+
+}
+function dgstats_player_set_uid($playername,$uid){
+  db_query("UPDATE {dgstats_player} set uid = %s where playername = '%s'",$uid,$playername);
+}
+function dgstats_player_verify_playername($playername){
+  $count = db_result(db_query("select count(*) from {dgstats_player} where playername = '%s'",$playername));
+  if($count == 0){
+    return false;
+  } else {
+    return true;
+  }
+}
+function dgstats_player_get_playername_by_uid($uid){
+  $query = "select playername from {dgstats_player} where uid = %s";
+  $playername = db_result(db_query($query,$uid));
+  return $playername;
+
+
+}
+
+function _dgstats_player_user_page_access(){
+
+}
+function dgstats_player_get_uid_by_playername($playername){
+  $uid = db_result(db_query("select uid from {dgstats_player} where playername  = '%s'",$playername));
+  if(!$uid)
+    return 0;
+  return $uid;
+}

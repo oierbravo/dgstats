@@ -1,0 +1,36 @@
+<?php
+// $Id$ 
+
+/**
+ * @file 
+ */
+
+/**
+ * Implementation of hook_install() 
+ */
+function dgstats_favgame_install() {
+    drupal_install_schema('dgstats_favgame');
+}
+
+/**
+ * Implementation of hook_uninstall() 
+ */
+function dgstats_favgame_uninstall() {
+    drupal_uninstall_schema('dgstats_favgame');
+}
+function dgstats_favgame_schema(){
+
+  $schema = array();
+
+  $schema['dgstats_favgame'] = array(
+    'fields' => array(
+      'uid'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE),
+      'gameid'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE),
+      'description'    => array('type' => 'varchar', 'length' => 516, 'not null' => TRUE, 'default' => ''),
+     
+    ),
+  );
+
+
+  return $schema;
+}

@@ -1,0 +1,334 @@
+<?php
+/**
+ *  Drupal Ghost Stats: Hero module
+ *
+ *  This modules contains most hero related task.
+ *  Its part of the required modules.
+ *
+ *  This file is a part of Drupal Ghost Stats.
+ *  Copyright (C) 2009 Oier Bravo Urtasun
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Affero General Public License as
+ *    published by the Free Software Foundation, either version 3 of the
+ *    License, or (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+define('DGSTATS_PAGE_HEROS','heroes');
+function dgstats_hero_menu() {
+
+  $items[DGSTATS_PAGE_HEROS] = array(
+    'title' => t('Heroes'),
+    'page callback' => 'dgstats_hero_page_heros',
+    'access arguments' =>array('access ghost stats'),
+    'menu_name' => 'primary-links',
+  );
+  $items[DGSTATS_PAGE_HEROS . '/%hero'] = array(
+    'title' => t('Heroes'),
+    'page callback' => 'dgstats_hero_page_hero',
+    'page arguments' => array(1),
+    'access arguments' =>array('access ghost stats'),
+  );
+  return $items;
+}
+function dgstats_hero(){
+
+}
+function dgstats_hero_page_heros(){
+  $output = '';
+   $headers = _dgstats_get_table_header('heroall');
+  
+     $heros = _dgstats_get_heros();
+  //   dpm(tablesort_get_querystring());
+$formated_heros = _dgstats_hero_format_heros($heros);
+ $output .= theme('table',$headers,$formated_heros);
+$output .= theme('pager');
+  return $output;
+}
+function _dgstats_hero_format_heros($heros){
+  $formated_heros = array();
+  foreach($heros as $hero){
+    $row  = array();
+     $row[] = l($hero['description'],DGSTATS_PAGE_HEROS . '/' .$hero['heroid']) ;
+    $row[] = theme_hero($hero['heroid']);
+   
+    $row[] = $hero['totgames'];
+     $row[] = $hero['wins'];
+    $row[] = $hero['losses'];
+     //$row[] = $hero['draws'];
+    $row[] = round($hero['kills'],1);
+    $row[] = round($hero['deaths'],1);
+    $row[] = round($hero['assists'],1);
+    $row[] = round($hero['creepkills'],1);
+    $row[] = round( $hero['creepdenies'],1);
+    $row[] = round($hero['neutralkills'],1);
+    $row[] = round($hero['towerkills'],1);
+    $formated_heros[] = $row;
+  }
+  return $formated_heros;
+}
+function dgstats_hero_page_hero($hero){
+   drupal_set_title($hero['description']);
+  $output = '';
+  
+
+  $header_hero =_dgstats_get_table_header('hero_resumen');
+
+  $formated_hero = dgstats_hero_format_hero($hero);
+
+  $output .= theme('hero_resumen',$hero);
+
+  $output .= theme('table',$header_hero, $formated_hero);
+
+  $output .= '<h3>Games</h3>';
+  $header_hero_games = _dgstats_get_table_header('hero_games');
+  $hero_games = _dgstats_get_hero_games($hero['hero']);
+  $formated_hero_games = dgstats_hero_format_hero_games($hero_games);
+    $output .= theme('table',$header_hero_games,$formated_hero_games);
+    $output .= theme('pager');
+
+  return $output;
+
+}
+function dgstats_hero_format_hero($hero){
+   $formated_hero = array();
+  $formated_hero[] = $hero['totgames'];
+  $formated_hero[] = $hero['wins'];
+  $formated_hero[] = $hero['losses'];
+ // $formated_hero[] = $hero['draws'];
+
+   $formated_hero[] = round($hero['kills'],1);
+    $formated_hero[] = round($hero['deaths'],1);
+    $formated_hero[] = round($hero['assists'],1);
+    $formated_hero[] = round($hero['creepkills'],1);
+    $formated_hero[] = round( $hero['creepdenies'],1);
+    $formated_hero[] = round($hero['neutralkills'],1);
+    $formated_hero[] = round($hero['towerkills'],1);
+
+  return array($formated_hero);
+}
+function dgstats_hero_format_hero_games($hero_games){
+  
+  $formated_games = array();
+  foreach($hero_games as $game){
+    $formated_game = array();
+    $formated_game[] = theme_playername($game['name']);
+    $formated_game[] = theme('gamename',$game['gamename'], $game['gameid']);
+    $formated_game[] = $game['datetime'];
+    $formated_game[] = round($game['kills'],1);
+    $formated_game[] = round($game['deaths'],1);
+    $formated_game[] = round($game['assists'],1);
+    $formated_game[] = round($game['creepkills'],1);
+    $formated_game[] = round( $game['creepdenies'],1);
+    $formated_game[] = round($game['neutralkills'],1);
+    $formated_game[] = round($game['towerkills'],1);
+    $formated_game[] = theme('gameresult',$game['result']);
+
+    $formated_games[] = $formated_game;
+  }
+  
+  return $formated_games;
+}
+function hero_load($hero_id){
+  $sql_aliases = "select heroid from originals where original='$hero_id'";
+  $result_aliases = db_query($sql_aliases);
+  $heroaliases = '';
+  while($row = db_fetch_array($result_aliases)){
+    $heroaliases .= "or hero='".$row["heroid"]."'";
+  }
+
+  $sql = "Select *, (kills*1.0/deaths) as kdratio, (wins*1.0/losses) as winratio From
+	(SELECT description, summary, skills, stats, hero, count(*) as totgames,
+	SUM(case when(((c.winner = 1 and a.newcolour < 6) or (c.winner = 2 and a.newcolour > 6)) AND d.`left`/e.duration >= 0) then 1 else 0 end) as wins,
+	SUM(case when(((c.winner = 2 and a.newcolour < 6) or (c.winner = 1 and a.newcolour > 6)) AND d.`left`/e.duration >= 0) then 1 else 0 end) as losses,
+	SUM(kills) as kills, SUM(deaths) as deaths, SUM(assists) as assists, SUM(creepkills) as creepkills, SUM(creepdenies) as creepdenies, SUM(neutralkills) as neutralkills, SUM(towerkills) as towerkills, SUM(raxkills) as raxkills, SUM(courierkills) as courierkills
+	FROM dotaplayers AS a LEFT JOIN originals as b ON hero = heroid LEFT JOIN dotagames as c ON c.gameid = a.gameid
+	LEFT JOIN gameplayers as d ON d.gameid = a.gameid and a.colour = d.colour LEFT JOIN games as e ON d.gameid = e.id where hero='$hero_id' $heroaliases group by description) as z order by description asc";
+
+  $result = db_query($sql);
+  $hero = db_fetch_array($result);
+
+  //$hero['games'] = _dgstats_get_hero_games($hero_id);
+
+  return $hero;
+}
+function _dgstats_hero_headers(){
+
+}
+function _dgstats_get_heros(){
+
+  $sql = "Select *, (kills*1.0/deaths) as kdratio, (wins*1.0/losses) as winratio From
+	(SELECT description, heroid, count(*) as totgames,
+	SUM(case when(((c.winner = 1 and a.newcolour < 6) or (c.winner = 2 and a.newcolour > 6)) AND d.`left`/e.duration >= 0) then 1 else 0 end) as wins,
+	SUM(case when(((c.winner = 2 and a.newcolour < 6) or (c.winner = 1 and a.newcolour > 6)) AND d.`left`/e.duration >= 0) then 1 else 0 end) as losses,
+	AVG(kills) as kills, AVG(deaths) as deaths, AVG(assists) as assists, AVG(creepkills) as creepkills, AVG(creepdenies) as creepdenies, AVG(neutralkills) as neutralkills
+	FROM dotaplayers AS a LEFT JOIN originals as b ON hero = heroid LEFT JOIN dotagames as c ON c.gameid = a.gameid
+	LEFT JOIN gameplayers as d ON d.gameid = a.gameid and a.colour = d.colour LEFT JOIN games as e ON d.gameid = e.id
+	WHERE description <>  'NULL' and c.winner <> 0 and gamestate = '16'
+group by description) as z where z.totgames > 0";
+  $order = _dgstats_get_order_str('heroall');
+  $sql .= $order;
+
+  $count_sql = "select count(*) from(select * from originals group by description) as a";
+  $result = pager_query($sql,20,0,$count_sql);
+//$result =pager_query($sql);
+$heros_raw = array();
+while($row = db_fetch_array($result)){
+    $heros_raw[] = $row;
+  }
+//dpm($players_raw);
+return $heros_raw;
+}
+function _dgstats_get_hero_games($hero_id){
+  $count_sql = "Select Count(*) as  count FROM (SELECT name FROM dotaplayers AS a LEFT JOIN gameplayers AS b ON b.gameid = a.gameid and a.colour = b.colour
+ LEFT JOIN dotagames AS c ON c.gameid = a.gameid LEFT JOIN games AS d ON d.id = a.gameid LEFT JOIN originals as e ON a.hero = heroid
+ where heroid = '$hero_id')as t";
+
+  $sql = "select CASE WHEN (deaths = 0 and kills = 0) THEN 0 WHEN (deaths = 0) then 1000 ELSE (kills*1.0/deaths) end as kdratio,
+ a.gameid as gameid, d.gamename,d.datetime, kills, deaths, assists, creepkills, neutralkills, creepdenies, towerkills, raxkills, courierkills, b.name as name, f.name as banname, CASE when(gamestate = '17') then 'PRIV' else 'PUB' end as type,
+  CASE when ((winner=1 and newcolour < 6) or (winner=2 and newcolour > 5)) AND b.`left`/d.duration >= 0  then 'WON' when ((winner=2 and newcolour < 6) or (winner=1 and newcolour > 5)) AND b.`left`/d.duration >= 0  then 'LOST' when  winner=0 then 'DRAW' else 'UNKNOWN' end as result
+ FROM dotaplayers AS a LEFT JOIN gameplayers AS b ON b.gameid = a.gameid and a.colour = b.colour
+ LEFT JOIN dotagames AS c ON c.gameid = a.gameid
+ LEFT JOIN games AS d ON d.id = a.gameid
+ LEFT JOIN originals as e ON a.hero = heroid
+ LEFT JOIN bans as f ON b.name = f.name
+ where heroid = '$hero_id'";
+
+
+ $order = _dgstats_get_order_str('hero_games');
+
+$sql .= $order;
+  $result = pager_query($sql,20,0,$count_sql);
+ //$result = db_query($sql);
+  $hero_games = array();
+  while($row = db_fetch_array($result)){
+    $hero_games[] = $row;
+  }
+  return $hero_games;
+}
+function _dgstats_get_player_heroes($playername){
+  $keys = array('killer','feeder','assister','winner','losser','gamer');
+  $herostats = array();
+  foreach($keys as $key){
+    $herostats[$key] = call_user_func('_dgstatas_hero_get_player_' . $key, $playername);
+  }
+
+  return $herostats;
+}
+function _dgstatas_hero_get_player_killer($playername){
+    $result = db_query("SELECT hero, max(kills) FROM dotaplayers AS a LEFT JOIN gameplayers AS b ON b.gameid = a.gameid and a.colour = b.colour where name= '$playername' group by hero ORDER BY max(kills) DESC LIMIT 1 ");
+    $entry =  db_fetch_array($result);
+    return array('heroid'=>$entry['hero'],'count'=>$entry['max(kills)']);
+
+}
+function _dgstatas_hero_get_player_feeder($playername){
+$result = db_query("SELECT hero, max(deaths) FROM dotaplayers AS a LEFT JOIN gameplayers AS b ON b.gameid = a.gameid and a.colour = b.colour where name= '$playername' group by hero ORDER BY max(deaths) DESC LIMIT 1 ");
+$entry =  db_fetch_array($result);
+    return array('heroid'=>$entry['hero'],'count'=>$entry['max(deaths)']);
+}
+function _dgstatas_hero_get_player_assister($playername){
+//find hero with most assists
+$result = db_query("SELECT hero, max(assists) FROM dotaplayers AS a LEFT JOIN gameplayers AS b ON b.gameid = a.gameid and a.colour = b.colour where name= '$playername' group by hero ORDER BY max(assists) DESC LIMIT 1 ");
+$entry =  db_fetch_array($result);
+    return array('heroid'=>$entry['hero'],'count'=>$entry['max(assists)']);
+}
+function _dgstatas_hero_get_player_winner($playername){
+
+//get hero with most wins
+$result = db_query("SELECT hero, COUNT(*) as wins FROM gameplayers LEFT JOIN games ON games.id=gameplayers.gameid LEFT JOIN dotaplayers ON dotaplayers.gameid=games.id AND dotaplayers.colour=gameplayers.colour LEFT JOIN dotagames ON games.id=dotagames.gameid WHERE name='$playername' AND((winner=1 AND dotaplayers.newcolour>=1 AND dotaplayers.newcolour<=5) OR (winner=2 AND dotaplayers.newcolour>=7 AND dotaplayers.newcolour<=11)) group by hero order by wins desc limit 1");
+$entry =  db_fetch_array($result);
+	//put an blank if you ahvent won
+	return array('heroid'=>$entry['hero'],'count'=>$entry['wins']);
+}
+function _dgstatas_hero_get_player_losser($playername){
+
+//get hero with most losses
+$result = db_query("SELECT hero, COUNT(*) as losses FROM gameplayers LEFT JOIN games ON games.id=gameplayers.gameid LEFT JOIN dotaplayers ON dotaplayers.gameid=games.id AND dotaplayers.colour=gameplayers.colour LEFT JOIN dotagames ON games.id=dotagames.gameid WHERE name='$playername' AND((winner=2 AND dotaplayers.newcolour>=1 AND dotaplayers.newcolour<=5) OR (winner=1 AND dotaplayers.newcolour>=7 AND dotaplayers.newcolour<=11)) group by hero order by losses desc limit 1");
+$entry =  db_fetch_array($result);
+	//put an blank if you ahvent won
+	return array('heroid'=>$entry['hero'],'count'=>$entry['losses']);
+	//put an x if you ahvent lost
+}
+function _dgstatas_hero_get_player_gamer($playername){
+//get hero you have played most with
+$result = db_query("SELECT SUM(`left`) as timeplayed, hero, COUNT(*) as played FROM gameplayers LEFT JOIN games ON games.id=gameplayers.gameid LEFT JOIN dotaplayers ON dotaplayers.gameid=games.id AND dotaplayers.colour=gameplayers.colour LEFT JOIN dotagames ON games.id=dotagames.gameid WHERE name='$playername' and hero<>'' group by hero order by played desc");
+$entry =  db_fetch_array($result);
+    return array('heroid'=>$entry['hero'],'count'=>$entry['played']);
+}
+function dgstats_hero_dgstats_player_load($player){
+    return array('heroes' =>_dgstats_get_player_heroes($player->playername) );
+}
+function dgstats_hero_dgstatsplayer($op,$player){
+  switch($op){
+    case 'load':
+      return array('heroes' =>_dgstats_get_player_heroes($player['name']) );
+    case 'view':
+      return array(
+        'heroes' => array(
+          '#title' => 'Heroes',
+          '#output' => theme('player_heroes',$player['heroes']),
+          '#weight' => 2,
+        ),
+      );
+      
+  }
+  
+}
+function dgstats_hero_theme(){
+  return array(
+   /* 'player_resumen' => array(
+      'arguments' => array('player' => null),
+    ),*/
+ 
+    'heroname' => array(
+      'arguments' => array('heroname' => null,'hero_id'=> null),
+    ),
+
+    'hero_resumen' => array(
+      'arguments' => array('hero' => null),
+    ),
+    'player_heroes' => array(
+      'arguments' => array('heros' => null),
+    ),
+
+  );
+}
+
+function theme_heroname($heroname){
+  return $heroname;
+}
+function theme_hero_resumen($hero){
+  $output = '';
+  $output .= '<div id="hero-resumen">';
+ // $img_src = drupal_get_path('module','dgstats') . '/images/heroes/' . $hero['hero'] . '.gif';
+  $output .= '<p>'.theme('hero',$hero['hero'],false,true,0,0,'left') . $hero['summary'] . '</p>';
+  $output .= '<p>' .$hero['stats'] . '<br/>' .  $hero['skills'] . '</p>';
+  $output .= '</div>';
+
+  return $output;
+}
+function theme_player_heroes($heroes){
+  $output = '';
+  $output .= '<div id="player-heroes">';
+  $headers = array();
+  $cols = array();
+  foreach($heroes as $key => $value){
+    $headers[] = strtoupper($key);
+    $row_hero[] = theme('hero',$value['heroid']);
+    $row_count[] = $value['count'];
+  }
+$rows = array($row_hero,$row_count);
+  $output = theme('table',$headers,$rows);
+ // $output .= '</div>';
+
+
+  return $output;
+}

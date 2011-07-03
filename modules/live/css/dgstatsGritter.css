@@ -1,0 +1,39 @@
+.gritterRed  .gritter-top {
+	background:url(../images/gritter-red.png) no-repeat left -30px;
+}
+.gritterRed .gritter-item {
+
+	background:url(../images/gritter-red.png) no-repeat left -40px;
+
+}
+.gritterRed .gritter-bottom {
+	background:url(../images/gritter-red.png) no-repeat left bottom;
+}
+
+
+.gritterGreen  .gritter-top {
+	background:url(../images/gritter-green.png) no-repeat left -30px;
+}
+.gritterGreen .gritter-item {
+
+	background:url(../images/gritter-green.png) no-repeat left -40px;
+
+}
+.gritterGreen .gritter-bottom {
+	background:url(../images/gritter-green.png) no-repeat left bottom;
+}
+
+.gritterBlue  .gritter-top {
+	background:url(../images/gritter-blue.png) no-repeat left -30px;
+}
+.gritterBlue .gritter-item {
+
+	background:url(../images/gritter-blue.png) no-repeat left -40px;
+
+}
+.gritterBlue .gritter-bottom {
+	background:url(../images/gritter-blue.png) no-repeat left bottom;
+}
+.gritter-close {
+	right:3px;
+}

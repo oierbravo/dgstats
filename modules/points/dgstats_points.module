@@ -1,0 +1,356 @@
+<?php
+/**
+ *  Project: Drupal Ghost Stats
+ *
+ *  Copyright (C) 2009 Oier Bravo Urtasun
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Affero General Public License as
+ *    published by the Free Software Foundation, either version 3 of the
+ *    License, or (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+function dgstats_points_menu(){
+  $items = array();
+  $items[DGSTATS_PAGE_CONFIG . '/points/recalculate'] = array(
+    'title' => 'Recalculate',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('dgstats_points_recalculate_confirm'),
+    'access arguments' =>array('access ghost stats'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['test-points'] = array(
+    'title' => 'Tests',
+    'page callback' => 'dgstats_points_player_page',
+//    'page arguments' => array('dgstats_points_recalculate_confirm'),
+    'access arguments' =>array('access ghost stats'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+function dgstats_points_dgstatsplayer($op,$player){
+  switch($op){
+    case 'load':
+        $output = array();
+
+        $output['points'] = dgstats_points_calculate($player);
+      return $output;
+    case 'view':
+      return array();
+    case 'database':
+       $database_extra['points'] = array(
+        'tablename' => 'scores',
+        'as' => 'sc',
+        'columns' => array('score'),
+        'on' => 'b.name = sc.name',
+        'fields' => array('sc.points'),
+      );
+      return $database_extra;
+
+  }
+
+}
+function dgstats_points_dgstatstable(){
+  $headers = array();
+  $headers['players'] = array(
+     array('data' => 'Points','field' => 'points','sort'=>'desc','theme' => 'table_cell_numeric_round','theme arguments' => 'points'),
+  );
+  return $headers;
+
+  }
+
+//function dgstats_points_dgstatsconfig($op){
+//  switch($op){
+//    case 'form':
+//      $form = array();
+//
+//      $form['pointsconfig'] = array(
+//        '#type' => 'fieldset',
+//        '#title' => t('Dota Points config'),
+//        '#weight' => 0,
+//        '#collapsible' => TRUE,
+//        '#collapsed' => FALSE,
+//      );
+//      $form['pointsconfig']['rebuil_points'] = array(
+//       // '#type' => 'submit',
+//        //'#value' => 'Calculate points',
+//        '#value' => l('Recalculate points',DGSTATS_PAGE_CONFIG . '/points/recalculate'),
+//
+//      );
+//
+//
+//      return $form;
+//    case 'validate':
+//      return array('dgstats_points_validate');
+//      break;
+//    case 'submit':
+//      return array('dgstats_points_submit');
+//      break;
+//
+//  }
+//}
+//function dgstats_points_validate($form_id,&$form_state){
+//
+//}
+//function dgstats_points_submit($form_id,&$form_state){
+//
+//}
+function dgstats_points_recalculate_batch() {
+  $batch = array(
+    'operations' => array(
+      array('dgstats_points_recalculate_process', array()),
+      ),
+    'finished' => 'dgstats_points_recalculate_finished',
+    'title' => t('Recalculating points'),
+    'init_message' => t('Recalculation is starting.'),
+    'progress_message' => t('Processed @current out of @total.'),
+    'error_message' => t('Encountered an error.'),
+  );
+  batch_set($batch);
+}
+function dgstats_points_recalculate_process(&$context) {
+  if (!isset($context['sandbox']['progress'])) {
+    $context['sandbox']['progress'] = 0;
+    $context['sandbox']['current_entry'] = 0;
+    $context['sandbox']['max'] = db_result(db_query('SELECT COUNT(DISTINCT id) FROM {games}'));
+  }
+
+  //dpm($context);
+  $limit = 1;
+
+  // With each pass through the callback, retrieve the next group of nids.
+//  $result = db_query_range(
+//    "SELECT dp.id as dotaplayerid,dg.winner as game_winner,name,kills,deaths,assists,creepkills,creepdenies,neutralkills,towerkills,raxkills  FROM dotaplayers AS dp
+//    LEFT JOIN gameplayers AS gp ON gp.gameid = dp.gameid and dp.colour = gp.colour
+//    LEFT JOIN dotagames AS dg ON dg.gameid = dp.gameid
+//    LEFT JOIN games as g ON g.id = dg.gameid
+//
+//     WHERE dp.id > %d ORDER BY dp.id ASC", $context['sandbox']['current_entry'], 0, $limit);
+$result = db_query_range(
+    "SELECT id  FROM games WHERE id > %d ORDER BY id ASC", $context['sandbox']['current_entry'], 0, $limit);
+  while ($row = db_fetch_array($result)) {
+
+    // Here we actually perform our processing on the current node.
+//    $player = $row;
+//    $context['sandbox'][$player['name']]['games'] += 1;
+//    if($player['game_winner'] == 1 && $player['color'] < 6 || $player['game_winner'] == 2 && $player['color'] > 6 ){
+//      $context['sandbox'][$player['name']]['wins'] += 1;
+//      $player['wins'] = $context['sandbox'][$player['name']]['wins'] ;
+//    } elseif($player['game_winner'] == 1 && $player['color'] > 6 || $player['game_winner'] == 2 && $player['color'] < 6 ){
+//      $context['sandbox'][$player['name']]['losses'] += 1;
+//      $player['losses'] = $context['sandbox'][$player['name']]['losses'] ;
+//    } elseif($player['game_winner'] == 0) {
+//      $context['sandbox'][$player['name']]['draws'] += 1;
+//      $player['draws'] = $context['sandbox'][$player['name']]['draws'] ;
+//    }
+//    $points = 666.666;
+//    $points  = dgstats_points_calculate($player);
+//    dgstats_points_save($row['id'],$points);
+      $game_players_sql = "SELECT dp.gameid as gameid,dp.id as dotaplayerid,name as playername,kills,deaths,assists,creepkills,creepdenies,neutralkills,towerkills,raxkills,
+      CASE when (winner=1 and dp.colour > 6) or (dg.winner=2 and dp.colour > 6) then 1 when  dg.winner=0 then 0 else 2 end as result
+        FROM dotaplayers AS dp
+        LEFT JOIN gameplayers AS gp ON gp.gameid = dp.gameid and dp.colour = gp.colour
+        LEFT JOIN dotagames AS dg ON dg.gameid = dp.gameid
+        WHERE dp.gameid = %d AND name <> '' AND name <> ' ' 
+      ";
+    $game_players = array();
+     $game_players_result = db_query($game_players_sql,$row['id']);
+     while($grow = db_fetch_array($game_players_result)){
+       $game_players[] = $grow;
+     }
+//     dpm($row['id']);
+     //dpm($game_players);
+     foreach($game_players as $player){
+       if($player['playername'] == ' '){
+         continue;
+       }
+        $last_data = _dgstats_points_get_last_info($player['playername'],$row['dotaplayerid']);
+        if(!$last_data){
+          $last_data = array(
+            'games' => 0,
+            'wins' => 0,
+            'losses' =>0,
+          );
+        }
+        //$new_data = array_merge($last_data,$player);
+        foreach($player as $key => $val){
+          if(isset($last_data[$key])){
+            $new_data[$key] = $lastdata[$key] + $val ;
+          } else {
+            $new_data[$key] = $val;
+          }
+        }
+//        dpm($new_data);
+        switch($player['result']){
+          case 0:
+            break;
+          case 1:
+            $new_data['wins']++;
+            break;
+          case 2:
+            $new_data['losses']++;
+            break;
+        }
+        $new_data['games']++;
+        $points = dgstats_points_calculate($new_data);
+        $new_data['points'] = $points;
+        dgstats_save_evolution($new_data);
+
+
+     }
+    // Store some result for post-processing in the finished callback.
+    $context['results'][] = check_plain($row['id']);
+
+    // Update our progress information.
+    $context['sandbox']['progress']++;
+    $context['sandbox']['current_entry'] = $row['id'];
+//    $context['message'] = t('Now processing %node', array('%node' => $node->title));
+  }
+
+  // Inform the batch engine that we are not finished,
+  // and provide an estimation of the completion level we reached.
+  if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
+    $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+  }
+}
+
+/**
+* Batch 'finished' callback
+*/
+function dgstats_points_recalculate_finished($success, $results, $operations) {
+  if ($success) {
+    // Here we do something meaningful with the results.
+    $message = count($results) .' entries processed.';
+//    $message .= theme('item_list', $results);
+  }
+  else {
+    // An error occurred.
+    // $operations contains the operations that remained unprocessed.
+    $error_operation = reset($operations);
+    $message = t('An error occurred while processing %error_operation with arguments: @arguments', array('%error_operation' => $error_operation[0], '@arguments' => print_r($error_operation[1], TRUE)));
+  }
+  drupal_set_message($message);
+}
+function dgstats_points_save($dotaplayerid,$points){
+//  $sql  = "REPLACE INTO {dotapoints} (dotaplayerid,points) VALUES (%d,%d)";
+//  db_query($sql,$dotaplayerid,$points);
+}
+function dgstats_save_evolution($player){
+//  if($player['playername'])
+//  $ignore = array('gameid' => 'gameid');
+  $ignore = array();
+  $strings = array('playername' => 'playername');
+  $cols = array();
+  $vals = array();
+  foreach($player as $col => $val){
+    if(isset($ignore[$col]))
+      continue;
+    
+    $cols[] = $col;
+    if(isset($strings[$col])){
+      $vals[] = "'$val'";
+    } else {
+      $vals[] = $val;
+    }
+    
+  }
+  $cols_str = implode(',',$cols);
+  $vals_str = implode(',',$vals);
+  $sql = "REPLACE INTO {dotaevolution} ($cols_str) VALUES ($vals_str)";
+  db_query($sql);
+}
+function dgstats_points_recalculate_confirm(){
+  $form = array();
+  return confirm_form($form,
+    t('Are you sure you want to recalculate points?'),
+    DGSTATS_PAGE_CONFIG,
+    t('This action cannot be undone.'),
+    t('Recalculate'),
+    t('Cancel')
+  );
+}
+function dgstats_points_recalculate_confirm_submit(){
+
+ dgstats_points_recalculate_batch();
+
+}
+
+function dgstats_points_calculate($player){
+
+    //Metodo por ahora ideal ya que permite en un futuro cambiar facilmente la formula con el UI
+// $formula = '( wins - losses )/ games  +  kills - deaths + assists /2 +  creepkills /100+ creepdenies /10+ neutralkills /50 +  raxkills /6+ towerkills /11';
+// dpm($player);
+    $formula = '( wins - losses )/ games  +  kills - deaths + assists /2 +  creepkills /100+ creepdenies /10+ neutralkills /50 +  raxkills /6+ towerkills /11';
+      $keywords = dgstats_points_keywords();
+  foreach($keywords as $word){
+    $formula = str_replace(" $word ", $player[$word], $formula);
+  }
+
+
+  $points = intval($formula);
+// Segunda opcion para calcular sacando las variables.
+//  extract($player, EXTR_SKIP);
+//  $formula = "(( $wins - $losses )/ $games ) + ( $kills - $deaths + $assists /2) + ( $creepkills /100+ $creepdenies /10+ $neutralkills /50) + ( $raxkills /6)+( $towerkills /11)";
+
+//    dpm($formula);
+//  eval("\$points=" .  $formula . ";");
+  eval("\$points=$formula;");
+  return $points;
+}
+function dgstats_points_keywords(){
+  return array(
+    'wins',
+    'losses',
+    'games',
+    'kills',
+    'deaths',
+    'assists',
+    'creepkills',
+    'creepdenies',
+    'neutralkills',
+    'raxkills',
+    'towerkills',
+    'points',
+  );
+}
+function _dgstats_points_get_last_info($playername,$dotaplayerid = null){
+  if($dotaplayerid != null){
+    $dotaplayerid_str = ' AND dotaplayerid < %d ';
+  }
+  $sql = "SELECT * from {dotaevolution} WHERE playername = '%s' $dotaplayerid_str ORDER BY dotaplayerid DESC LIMIT 1";
+  $last_info = db_fetch_array(db_query($sql,$playername,$dotaplayerid));
+  return $last_info;
+}
+
+
+function _dgstats_points_get_parsed_last_id(){
+    return variable_get('dgstats_last_parsed_id','0');
+}
+function _dgstats_points_get_played_last_id(){
+    $sql = 'SELECT id from {games} ORDR BY id DESC LIMIT 1';
+    $id = db_result(db_query($sql));
+    return $id;
+}
+function dgstats_points_player_page(){
+    $player = 'KaiZO';
+    $output = '';
+    dpm(dgstats_points_get_player_evolution($player));
+    return $output;
+}
+function dgstats_points_get_player_evolution($playername,$numgames = 10){
+    $sql = "select * from {dotaevolution} where playername = '%s' ORDER BY gameid DESC LIMIT $numgames";
+   $result = db_query($sql,$playername);
+   $rows = array();
+   while($row = db_fetch_array($result)){
+       $rows[] = $row;
+   }
+   return $rows;
+}

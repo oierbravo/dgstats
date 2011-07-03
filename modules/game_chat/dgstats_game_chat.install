@@ -1,0 +1,15 @@
+<?php
+/**
+ * Implementation of hook_install() 
+ */
+function dgstats_game_chat_install() {
+
+}
+
+
+/**
+ * Implementation of hook_unistall() 
+ */
+function dgstats_game_chat_unistall() {
+
+}

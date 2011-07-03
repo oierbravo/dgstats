@@ -1,0 +1,81 @@
+<?php
+/**
+ *  Project: Drupal Ghost Stats
+ *
+ *  Copyright (C) 2009 Oier Bravo Urtasun
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Affero General Public License as
+ *    published by the Free Software Foundation, either version 3 of the
+ *    License, or (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/**
+ * Implementation of hook_install() 
+ */
+function dgstats_points_install() {
+  drupal_install_schema('dgstats_points');
+}
+
+
+/**
+ * Implementation of hook_unistall() 
+ */
+function dgstats_points_unistall() {
+  drupal_uninstall_schema('dgstats_points');
+}
+function dgstats_points_schema(){
+
+  $schema = array();
+
+  $schema['dotaevolution'] = array(
+    'fields' => array(
+      'gameid'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE),
+      'dotaplayerid'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE),
+      'playername'    => array('type' => 'varchar', 'length' => 15, 'not null' => TRUE, 'default' => ''),
+      'points'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+      'games'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'wins'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'losses'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'kills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'deaths'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'assists'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'creepkills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'creepdenies'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'neutralkills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'towerkills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'raxkills'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+      'result'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
+    ),
+    'primary key' => array('dotaplayerid'),
+    'indexes' => array(
+      'dotaplayerid' => array('dotaplayerid'),
+    ),
+  );
+
+//  $schema['node'] = array(
+//    'fields' => array(
+//    'nid'      => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+//    'vid'      => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
+//    'type'     => array('type' => 'varchar', 'length' => 32, 'not null' => TRUE, 'default' => ''),
+//    'title'    => array('type' => 'varchar', 'length' => 128, 'not null' => TRUE, 'default' => ''),
+//    ),
+//    'primary key' => array('nid'),
+//    'unique keys' => array(
+//    'vid'     => array('vid')
+//    ),
+//    'indexes' => array(
+//    'nid'                 => array('nid'),
+//    'node_title_type'     => array('title', array('type', 4)),
+//    ),
+//  );
+
+  return $schema;
+}

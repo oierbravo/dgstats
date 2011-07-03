@@ -1,0 +1,670 @@
+<?php
+/**
+ *  Project: Drupal Ghost Stats
+ *
+ *  Copyright (C) 2009 Oier Bravo Urtasun
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Affero General Public License as
+ *    published by the Free Software Foundation, either version 3 of the
+ *    License, or (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+define('DGSTATS_PAGE_BANS','bans'); 
+define('DGSTATS_PAGE_ADMINS','admins');
+
+define('DGSTATS_BLOCK_LASTGAME',0);
+define('DGSTATS_BLOCK_BAN_SEARCH',1);
+/**
+ * Implementation of hook_menu()
+ */
+function dgstats_menu() {
+ 
+  $items[DGSTATS_PAGE_BANS] = array(
+    'title' => 'Bans',
+    'page callback' => 'dgstats_bans_page',
+    'access arguments' =>array('access ghost stats'),
+    'menu_name' => 'primary-links',
+  );
+  $items[DGSTATS_PAGE_BANS . '/search'] = array(
+    'title' => 'Bans search result',
+    'page callback' => 'dgstats_bans_search_page',
+    'access arguments' =>array('access ghost stats'),
+   'type' => MENU_CALLBACK,
+  );
+  $items[DGSTATS_PAGE_BANS . '/autocomplete'] = array(
+    'page callback' => 'dgstats_bans_autocomplete_js',
+    'access arguments' =>array('access ghost stats'),
+   'type' => MENU_CALLBACK,
+  );
+   $items[DGSTATS_PAGE_ADMINS] = array(
+    'title' => 'Admins',
+    'page callback' => 'dgstats_admins_page',
+    'access arguments' =>array('access ghost stats'),
+    'menu_name' => 'primary-links',
+  );
+   $items['test-dgstats'] = array(
+    'title' => 'test dgstats',
+    'page callback' => 'dgstats_testpage',
+    'access arguments' =>array('access ghost stats'),
+  );
+
+
+  return $items;
+}
+
+
+function dgstats_testpage(){
+  $output = 'Test - dgstats';
+//  $player = player_load('KaiZO');
+//  $points = dgstats_points_calculate($player);
+//  dpm($points);
+  $args = array('playername' => 'KaiZO');
+  $data = dgstat_charts_player_evolution($args);
+    //  return DGSTATS_BOT_HOSTING_TRUE;
+  //7} else {
+    //return DGSTATS_BOT_HOSTING_FALSE;
+  //    return "Port 6112 alvicio.hopto.org is not open.";
+ // }
+//  $tops = dgstats_tops_get_tops();
+//  $output = theme('tops_lists',$tops);
+//$players = dgstats_get_players();
+//dpm($players);
+/*$data = array(
+  'Internet Explorer' => 66.82,
+  'Firefox' => 22.05,
+  'Safari' => 8.23,
+  'Opera' => 0.70,
+  'Other' => 2.20,
+);
+
+$pie = ofc_api_element('pie');
+$pie->set('alpha', 0.8);
+
+$fade = ofc_api_element('fade');
+
+$bounce = ofc_api_element('bounce');
+$bounce->set('distance', 5);
+
+$pie->set('animate', array($fade, $bounce));
+$pie->set('start-angle', 0);
+$pie->set('tip', '#percent#');
+$pie->set('colours', ofc_api_color_theme('green'));
+
+foreach ($data as $key => $value) {
+  $item = array(
+    'value' => $value,
+    'label' => $key,
+  );
+
+  $pie->add('value', $item);
+}
+
+$chart = ofc_api_chart();
+
+$chart->add('element', $pie);
+
+$title = array(
+  'text' => 'Browser market share',
+  'style' => 'color: #f0f0f0; font-size: 20px',
+);
+
+$chart->set('title', $title);
+$chart->set('bg_colour', '#202020');*/
+//$output =  ofc_api_render('dgstats_charts_clan_points',800,400);
+//
+//$playername = 'KaiZO';
+//
+//$games = dgstats_get_player_history($playername);
+////dpm($games);
+//$evolution = dgstats_player_get_evolution($games);
+//dpm($evolution);
+  return $output;
+}
+//function dgstats_init(){
+//drupal_set_message('He abierto el registro y ya no es necesaria la aprovacion del admin.<br>Utilizaremos el foro para todo.');
+//
+function dgstats_perm(){
+  return array(
+    'access ghost stats',
+    
+  );
+}
+
+function dgstats_bans_page(){
+
+  $output = '';
+  $headers = _dgstats_get_table_header('bans');
+
+  $order = tablesort_sql($headers);
+  $bans = dgstats_get_bans($order);
+  $output .= theme('table',$headers,$bans);
+  $output .= theme('pager');
+  return $output;
+}
+function dgstats_bans_search_page(){
+    $breadcrumb = drupal_get_breadcrumb();
+  $breadcrumb[] = l(t('Bans'),DGSTATS_PAGE_BANS);
+  drupal_set_breadcrumb($breadcrumb);
+  $key = _dgstats_get_search_ban_playername();
+  if(!$key){
+    drupal_goto('stats/bans');
+  }
+
+
+  $output = '';
+  $headers = _dgstats_get_table_header('bans');
+
+  $order = tablesort_sql($headers);
+  $bans = dgstats_get_bans($order,$key);
+
+//  $output .= '<div>';
+//  $output .= '<h3>Search a ban</h3>';
+//  $output .= drupal_get_form('dgstats_ban_search_form');
+//  $output .= '</div>';
+
+  $output .= theme('table',$headers,$bans);
+  $output .= theme('pager');
+  return $output;
+}
+
+function dgstats_get_bans($order,$search_key = null){
+    $sql = 'SELECT  name,reason,date,admin FROM {bans}';
+    if($search_key != null){
+      $sql .= " WHERE name LIKE '%$search_key%' ";
+    }
+
+
+    $sql .= $order;
+
+    $bans = array();
+    $result = pager_query($sql,30,0);
+    while($row = db_fetch_array($result)){
+      $bans[] = $row;
+    }
+    return $bans;
+}
+function dgstats_verify_ban($playername){
+  $sql = "select * from bans where name = '$playername'";
+  $result = db_query($sql);
+  $ban_info = db_fetch_array($result);
+  if(!$ban_info){
+    return false;
+  } else {
+    return $ban_info;
+  }
+}
+function dgstats_dgstats_server(){
+  $serverstats = array();
+  $serverstats['bans']= array(
+    'label' => 'Total bans',
+    'data' => _dgstats_get_total_bans()
+  );
+  $serverstats['admins']= array(
+    'label' => 'Total admins',
+    'data' => _dgstats_get_total_admins()
+  );
+  return $serverstats;
+}
+function dgstats_dgstats_player(&$player){
+  $banned = dgstats_verify_ban($player['name']);
+  if($banned){
+    $player['banned'] = true;
+    $player['baninfo'] = $banned;
+  }
+}
+function dgstats_admins_page(){
+  $output = '';
+  $headers = _dgstats_get_table_header('admins');
+  
+
+  $order = tablesort_sql($headers);
+  $admins = dgstats_get_admins($order);
+  $formated_admins = array();
+  foreach($admins as $admin){
+    $row = array();
+    $row[] = l($admin['name'],'stats/players/' . $admin['name']) ;
+    $row[] = $admin['gameshosted'];
+
+    $formated_admins[] = $row;
+  }
+  //$output = '<div></div>';
+
+  $output .= theme('table',$headers,$formated_admins);
+  $output .= theme('pager');
+  return $output;
+}
+
+function dgstats_get_admins($order){
+  $sql = 'SELECT name,(select count(*)from {games} g where g.ownername = a.name) as gameshosted from {admins} a';
+  $sql .= $order;
+  
+  $admins = array();
+  $result = pager_query($sql,30,0);
+    while($row = db_fetch_array($result)){
+      $admins[] = $row;
+    }
+    return $admins;
+}
+
+
+
+function dgstats_theme(){
+  return array(
+     'team' => array(
+      'arguments' => array('team' => null,'type' => 'normal'),
+    ),
+     'time_seconds' => array(
+      'arguments' => array('time' => null),
+    ),
+    'dgstats_table' => array(
+      'arguments' => array(
+        'table_key' => null,
+        'data' => null,
+      )
+    ),
+    'table_cell_no_theme' => array(
+      'arguments' => array('data' => null),
+    ),
+    'table_cell_numeric_round' => array(
+      'arguments' => array('data' => null),
+    ),
+  );
+}
+function theme_table_cell_no_theme($data){
+  return $data;
+}
+function theme_table_cell_numeric_round($data){
+  if(!is_numeric($data)){
+    return 'ERR';
+  }
+  return round($data,2);
+}
+function theme_dgstats_table($table_key,$data){
+  $header = _dgstats_get_table_header($table_key);
+//  module_invoke_all('dgstats_tableheader_alter',$tablekey,$header);
+//  module_invoke_all('dgstats_tabledata_alter',$tablekey,$data);
+  
+  $formated_data = dgstats_format_table($header,$data);
+
+  return theme('table',$header,$formated_data);
+}
+//function dgstats_
+function theme_team($team,$type = 'simple'){
+  $output = '';
+  if($team == 0){
+    $teamname = 'Sentinel';
+  } else {
+    $teamname = 'Scourge';
+  }
+  switch($type){
+    default:
+    case 'normal':
+      $output .= theme('icono','team-' . $team);
+       $output .= $teamname;
+      break;
+    case 'game-player';
+      $output .= theme('icono','team-' . $team);
+      break;
+    case 'table':
+      $output .= theme('icono','team-' . $team);
+       break;
+     case 'simple':
+      $output .= theme('icono','team-' . $team);
+       break;
+  }
+  return $output;
+}
+
+/**
+ * Implementation of hook_block()
+ */
+
+
+function dgstats_block($op='list', $delta=0, $edit=array()) {
+  switch ($op) {
+    case 'list':
+      $blocks[DGSTATS_BLOCK_LASTGAME] = array(
+        'info'       => t('Lastgame'),
+      );
+       $blocks[DGSTATS_BLOCK_BAN_SEARCH] = array(
+        'info'       => t('Search a ban'),
+      );
+      return $blocks;
+  case 'configure':
+
+      $form = array();
+      return $form;
+    case 'save':
+
+      return;
+    case 'view': default:
+      switch ($delta) {
+        case DGSTATS_BLOCK_LASTGAME:
+          // The subject is displayed at the top of the block. Note that it
+          // should be passed through t() for translation.
+          $block['subject'] = t('Last game');
+          // The content of the block is typically generated by calling a custom
+          // function.
+          $block['content'] = dgstats_block_contents($delta);
+          break;
+        case DGSTATS_BLOCK_BAN_SEARCH:
+
+          $block['subject'] = 'Search a ban';
+          $block['content'] = dgstats_block_contents($delta);
+          break;
+      }
+      return $block;
+
+  }
+}
+
+function dgstats_block_contents($delta){
+  switch ($delta) {
+        case DGSTATS_BLOCK_LASTGAME:
+//          $lastgame = dgstats_get_last_game();
+
+          return theme('lastgame',$lastgame);
+          break;
+        case DGSTATS_BLOCK_BAN_SEARCH:
+          return drupal_get_form('dgstats_ban_search_form');
+          break;
+        default:
+          break;
+  }
+}
+function dgstats_ban_search_form(){
+   $form = array();
+  $playername = _dgstats_get_search_ban_playername();
+  if(!$playername){
+    $playername = '';
+  }
+
+  $form['bankey'] = array(
+    '#type' => 'textfield',
+    '#weight' => 1,
+    '#maxlength' => 18,
+    '#size' => 20,
+    '#default_value' => $playername,
+    '#autocomplete_path' => DGSTATS_PAGE_BANS . '/autocomplete',
+  );
+  $form['submit'] = array(
+    '#name' => 'btn_search_ban',
+    '#type' => 'submit',
+    '#value' => t('Search'),
+    '#weight' => 2,
+  );
+  return $form;
+}
+function dgstats_ban_search_form_submit(&$form,&$form_state){
+    if(!isset($form_state['values']['bankey'])){
+     drupal_goto(DGSTATS_PAGE_BANS);
+  } else {
+    $search_key = check_plain($form_state['values']['bankey']);
+  }
+  drupal_goto(DGSTATS_PAGE_BANS . '/search',array('bkey'=> $search_key));
+}
+
+
+
+function dgstats_get_heros(){
+
+
+  $sql = "Select *, (totgames-wins) as losses, (kills*1.0/deaths) as kdratio, (wins*1.0/totgames) as winratio From
+	(SELECT description, heroid, count(*) as totgames,
+	SUM(case when((c.winner = 1 and a.newcolour < 6) or (c.winner = 2 and a.newcolour > 6)) then 1 else 0 end) as wins, AVG(kills) as kills, AVG(deaths) as deaths,
+	AVG(assists) as assists, AVG(creepkills) as creepkills, AVG(creepdenies) as creepdenies, AVG(neutralkills) as neutralkills
+	FROM dotaplayers AS a LEFT JOIN originals as b ON hero = heroid LEFT JOIN dotagames as c ON c.gameid = a.gameid
+	LEFT JOIN gameplayers as d ON d.gameid = a.gameid and a.colour = d.colour LEFT JOIN games as e ON d.gameid = e.id
+	WHERE description <>  'NULL' and c.winner <> 0
+group by description) as z where z.totgames > 0 ";
+	
+	
+  $result  = db_query($sql);
+  $heros = array();
+  while($row = db_fetch_array($result)){
+    $heros[] = $row;
+  }
+  return $heros;
+}
+
+
+function _order_field_map($alias){
+  $fields = array(
+
+
+  );
+}
+
+function _dgstats_get_table_header($key){
+  static $headers;
+  if(isset($headers[$key])){
+    return $headers[$key];
+  }
+  if($headers == null){
+    $headers = array();
+  }
+  $headers = module_invoke_all('dgstatstable');
+  
+  
+  
+$headers['admins'] = array(
+    array('data' => 'name','field'=>'name'),
+    array('data' => 'gameshosted','field'=>'gameshosted'),
+
+  );
+$headers['bans'] = array(
+    array('data' => 'name','field'=>'name'),
+    array('data' => 'reason','field'=>'reason'),
+    array('data' => 'date','field'=>'date','sort' => 'desc'),
+    array('data' => 'admin','field'=>'admin'),
+  );
+  $headers['heroall'] = array(
+    array('data' => 'description','field'=>'description','sort' => 'asc'),
+    array('data' => 'heroid','field'=>'heroid'),
+     array('data' =>'Games','field' =>'totgames', ),
+    array('data' => 'Wins','field' => 'wins'),
+    array('data' =>'Losses','field' => 'losses'),
+   // array('data' =>'Draws','field' => 'draws'),
+    array('data' => 'Kills','field' => 'kills'),
+  array('data' => 'Deaths','field' => 'deaths'),
+  array('data' => 'Assists','field' => 'assists'),
+  array('data' => 'C.K',),
+  array('data' => 'C.D',),
+  array('data' => 'N.K',),
+  array('data' => 'T.K',),
+  );
+  $headers['hero_resumen'] = array(
+    array('data' =>'Games','field' =>'totgames' ),
+    array('data' => 'Wins','field' => 'wins'),
+    array('data' =>'Losses','field' => 'losses'),
+   // array('data' =>'Draws','field' => 'draws'),
+    array('data' => 'Kills','field' => 'kills'),
+  array('data' => 'Deaths','field' => 'deaths'),
+  array('data' => 'Assists','field' => 'assists'),
+  array('data' => 'C.K',),
+  array('data' => 'C.D',),
+  array('data' => 'N.K',),
+  array('data' => 'T.K',),
+  );
+  $headers['hero_games'] = array(
+    array('data' => 'Player','field' => 'name'),
+    array('data' =>'Game','field' =>'gamename' ),
+    array('data' => 'Date','field' => 'datetime','sort' => 'desc'),
+    
+   // array('data' =>'Draws','field' => 'draws'),
+    array('data' => 'Kills','field' => 'kills'),
+  array('data' => 'Deaths','field' => 'deaths'),
+  array('data' => 'Assists','field' => 'assists'),
+  array('data' => 'C.K',),
+  array('data' => 'C.D',),
+  array('data' => 'N.K',),
+  array('data' => 'T.K',),
+  array('data' => 'Result','field' => 'result'),
+  );
+
+  $headers['current_game'] = array(
+     array(
+        'data' => 'Gamename',
+        'field' => 'name',
+        'theme' => 'current_gamename',
+        'theme arguments' => 'gid,name',
+     ),
+     array('data' => 'Owner','field' => 'owner'),
+     array('data' => 'Map','field' => 'map'),
+  );
+  $headers['current_players'] = array(
+     array('data' => 'Playername','field' => 'playername'),
+     array('data' => 'Slot','field' => 'slot','sort' => 'asc'),
+     array('data' => 'Kills','field' => 'kills'),
+     array('data' => 'Deaths','field' => 'deaths'),
+  );
+  drupal_alter('dgstatstable',$headers);
+//  module_invoke_all('dgstatstable_headeralter',$headers);
+
+  if(isset($headers[$key])){
+    return $headers[$key];
+  } else {
+    return array();
+  }
+}
+
+function _dgstats_get_order_str($key){
+  $header = _dgstats_get_table_header($key);
+  foreach($header as $key => $values){
+      if(isset($values['sort'])){
+        $default_order = $values['field'];
+        $default_sort = $values['sort'];
+      }
+    }
+  if(!$default_order){
+    return '';
+  } else {
+
+
+    if(isset($_REQUEST['order'])){
+      $order = check_plain($_REQUEST['order']);
+      $sort = check_plain($_REQUEST['sort']);
+      //$order_str = " ORDER BY $order $sort";
+    //} else {
+      //$order_str  = ' ORDER by name ASC';
+    //}
+
+      foreach($header as $key => $values){
+        if($values['data'] == $order){
+          $col = $values['field'];
+        }
+      }
+      if(!$col){
+        $col = $default_order;
+      }
+      if(!$sort){
+        $sort = $default_sort;
+      }
+      $order_str =  " ORDER BY $col $sort";
+
+    } else {
+      $order_str = " ORDER BY $default_order $default_sort";
+    }
+
+    return $order_str;
+  }
+}
+function dgstats_format_table($headers,$rows){
+  $formated_rows = array();
+//  dpm($games);
+  foreach($rows as $row){
+    if(is_object($row))
+      $row = (array) $row;
+    
+    $formated_row = array();
+    foreach($headers as $field){
+      
+      if(isset($field['theme'])){
+        $args =array($field['theme']);
+        $theme_args = explode(',',$field['theme arguments']);
+        foreach($theme_args as $theme_arg){
+          $args[] = $row[$theme_arg];
+        }
+        if(!isset($field['field'])){
+          $field['field'] = strtolower($field['data']);
+        }
+        $formated_row[$field['field']] = call_user_func_array('theme', $args);
+      } else {
+        if(isset($field['field'])){
+          $formated_row[$field['field']] = $row[$field['field']];
+        } else {
+          $key = strtolower($field['data']);
+          $formated_row[$key] = $row[$key];
+        }
+      }
+
+    }
+    $formated_rows[] = $formated_row;
+  }
+  return $formated_rows;
+}
+function _dgstats_get_search_ban_playername(){
+  if(isset($_REQUEST['bkey'])){
+    $playername = check_plain($_REQUEST['bkey']);
+    return $playername;
+  } else {
+    return false;
+  }
+}
+
+function theme_time_seconds($time){
+   $output = '';
+   $mins = round($time / 60);
+   $secs = round($time % 60);
+   $output .= "$mins:$secs" ;
+   return $output;
+}
+
+function _dgstats_get_total_bans(){
+ $sql = "select count(*) as numbans from bans";
+
+  $result = db_query($sql);
+  $row = db_fetch_array($result);
+  $bans = $row['numbans'];
+  return $bans;
+}
+function _dgstats_get_total_admins(){
+$sql = "select count(*) as numadmins from admins";
+
+  $result = db_query($sql);
+  $row = db_fetch_array($result);
+  $admins = $row['numadmins'];
+  return $admins;
+}
+function dgstats_bans_autocomplete_js($string){
+  $sql = "SELECT name from bans WHERE LOWER(name) LIKE LOWER('%%%s%%')";
+  $result = db_query_range($sql, $string, 0, 10);
+  $matches = array();
+  while($row = db_fetch_array($result)){
+    $matches[$row['name']] = check_plain(trim($row['name']));
+  }
+  print drupal_to_js($matches);
+  exit();
+}
+function dgstats_call_theme(){
+  $args = func_get_args();
+//  dpm($args);
+  return call_user_func('theme',$args[0]);
+}
+function _dgstats_get_last_played_gameid(){
+    $sql = 'select id from {games} ORDER BY id DESC LIMIT 1';
+    $gameid = db_result($sql);
+    return $gameid;
+}
+
+function _dgstats_get_last_processed_gameid(){
+    return variable_get('dgstats_last_processed_gameid',0);
+}

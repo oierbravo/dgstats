@@ -1,0 +1,3 @@
+This files are part of gstatspp project.
+Full code at http://code.google.com/p/gstatspp
+Licensed under GPL3.

@@ -1,0 +1,173 @@
+<?php
+define('DGSTATS_REPLAY_PREFIX','alvicio.org ');
+define('DGSTATS_REPLAY_EXTENSION','.w3g');
+function dgstats_replay_menu(){
+  $items = array();
+  $items[DGSTATS_PAGE_GAMES . '/%game' . '/download'] = array(
+    'title' => 'Replay download',
+    'page callback' => 'dgstats_replay_page_download',
+    'page arguments' => array(1),
+    'access arguments' =>array(1),
+    'access callback' => '_dgstats_replay_download_access',
+    'type' =>MENU_LOCAL_TASK,
+  );
+  return $items;
+}
+function _dgstats_replay_download_access($game){
+  $replay_path = dgstats_replay_get_download($game);
+  if(file_exists($replay_path)){
+    return true;
+  } else {
+    return false;
+  }
+}
+function dgstats_replay_page_download($game){
+  $replay_path = dgstats_replay_get_download($game);
+  dgstats_replay_set_stats($game['id']);
+  header("Content-type: application/octet-stream");
+  header('Content-disposition: attachment; filename="' . DGSTATS_REPLAY_PREFIX .  basename($replay_path) . '"');
+  // and output the contents of the file
+  readfile($replay_path);
+}
+function dgstats_replay_get_download($game,$array = false){
+   $botdir = variable_get('dgstats_config_botdir', '');
+   $replaydir = $botdir . '/replays/';
+//   $replay_path = $replaydir . DGSTATS_REPLAY_PREFIX . ' ' . $game['datetime'] . ' ' . $game['gamename'] . DGSTATS_REPLAY_EXTENSION;
+//   dpm($replay_path);
+//   if(file_exists($replay_path)){
+//
+//     return 'Replay, OK';
+//   } else {
+//     return 'NO REPLAY';
+//   }
+    $replayLocation = $replaydir;
+   $gametime = $game['datetime'];
+   $gametimenew = substr(str_ireplace(":","-",$gametime),0,16);
+//   dpm($gametimenew);
+   $gamename = $game['gamename'];
+
+  //REPLAY NAME HANDLING CODE
+  $replaygamename=str_ireplace("|","_",str_ireplace(">","_",str_ireplace("<","_",str_ireplace("?","_",str_ireplace("*","_",str_ireplace(":","_",str_ireplace("/","_",str_ireplace("\\","_",$gamename))))))));
+  //$replayloc="GHost++ ".$gametimenew." ".$replaygamename." (".dgstats_convert_time($duration,'-').").w3g";
+   $replayloc="GHost++ " . $gametimenew . " $replaygamename.w3g";
+
+  if(!file_exists($replayLocation. $replayloc))
+  {													//Time handling isn't perfect. Check time + 1 and time - 1
+ //   $replayloc="GHost++ ".$gametimenew." ".$replaygamename." (".dgstats_convert_time($duration-1,'-').").w3g";
+  //  if(!file_exists($replayLocation.'/'.$replayloc))
+   // {
+    //  $replayloc="GHost++ ".$gametimenew." ".$replaygamename." (".dgstats_convert_time($duration+1,'-').").w3g";
+     // if(!file_exists($replayLocation.'/'.$replayloc))
+     // {
+      //  $replayloc="GHost++ ".$gametimenew." ".$replaygamename.".w3g";
+     // }
+   // }
+  }
+//  dpm($replayLocation. $replayloc);
+  //$replayurl = $replayLocation.'/'.str_ireplace("#","%23", str_ireplace("\\","_",str_ireplace("/","_",str_ireplace(" ","%20",$replayloc))));
+  //$replayloc = $replayLocation.'/'.str_ireplace("\\","_",str_ireplace("/","_",$replayloc));
+  if($array){
+    return array(
+      'full_path' => $replayLocation . $replayloc,
+      'path' => $replayLocation,
+      'name' =>  $replayloc,
+    );
+  }
+  return $replayLocation . $replayloc;
+//  if(file_exists($replayLocation . $replayloc)){
+//
+//     return t('Replay avalible') . l('Download');
+//   } else {
+//     return t('No replay avalible');
+//   }
+
+}
+function dgstats_replay_verify($game){
+  $replay_path = dgstats_replay_get_download($game);
+  if(file_exists($replay_path)){
+
+     return t('Replay avalible ') . l('Download',DGSTATS_PAGE_GAMES . '/' . $game['id'] . '/download');
+   } else {
+     return t('No replay avalible');
+   }
+}
+function dgstats_replay_dgstatsgame($op,$game){
+  switch($op){
+    case 'load':
+
+      return array('replay' => dgstats_replay_get_download($game,true));
+      break;
+    case 'view':
+
+    dpm(dgatats_replay_get_download_count($game['id']));
+       return array(
+//        'replay' => array(
+//          '#title' => 'Replay',
+//          '#output' => dgstats_replay_verify($game),
+//          '#weight' => 2,
+//        ),
+      );
+      break;
+  }
+}
+
+//function dgstats_replay_dgstatsconfig($op){
+//  switch($op){
+//    case 'form':
+//      $form = array();
+//      $botdir = variable_get('dgstats_config_botdir', '');
+//      $form['replayconfig'] = array(
+//        '#type' => 'fieldset',
+//        '#title' => t('Bot config'),
+//        '#weight' => 0,
+//        '#collapsible' => TRUE,
+//        '#collapsed' => FALSE,
+//      );
+//
+//
+//      $form['replayconfig']['replaydir'] = array(
+//        '#type' => 'textfield',
+//        '#default_value' => $botdir,
+//        '#title' => 'Bot installation path',
+//        '#description' => 'Path relative to drupal installation.Example: ./ghostone',
+//        '#required' => TRUE,
+//      );
+//      if($botdir != ''){
+//        $text_filenames = _dgstats_config_file_names();
+//        foreach($text_filenames as $key => $text_file_name){
+//
+//          $file_path = $botdir . '/' . $text_file_name;
+//          $file_content = file_get_contents($file_path);
+//
+//          $form['botconfig']['textfile-' . $key] = array(
+//            '#type' => 'textarea',
+//            '#title' => 'File: ' . $text_file_name,
+//            '#default_value' => $file_content,
+//          );
+//        }
+//
+//      }
+//      return $form;
+//    case 'validate':
+//      return array('dgstats_config_botconfig_validate');
+//      break;
+//    case 'submit':
+//      return array('dgstats_config_botconfig_submit');
+//      break;
+//
+//  }
+//}
+
+function dgstats_replay_set_stats($gameid){
+  $item = new stdClass();
+  $item->gameid = $gameid;
+  global $user;
+  $item->uid = $user->uid;
+  $item->timestamp = time();
+  drupal_write_record('replay_dowload_statistics',$item);
+}
+function dgatats_replay_get_download_count($gameid){
+  $sql = "select count(*) from {replay_dowload_statistics} where gameid = %d";
+  $count = db_result(db_query($sql,$gameid));
+  return $count;
+}

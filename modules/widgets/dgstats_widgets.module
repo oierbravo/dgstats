@@ -1,0 +1,297 @@
+<?php
+/**
+ *  Project: Drupal Ghost Stats
+ *
+ *  Copyright (C) 2009 Oier Bravo Urtasun
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Affero General Public License as
+ *    published by the Free Software Foundation, either version 3 of the
+ *    License, or (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+define('DGSTATS_WIDGET_LAST_GAME',0);
+define('DGSTATS_WIDGET_PLAYER',1);
+
+
+/**
+ * Implementation of hook_menu()
+ */
+function dgstats_widgets_menu() {
+  $items['stats/widgets.php'] = array(
+      'title' => '',
+    'page callback' => 'dgstats_widgets_page',
+    'access arguments' =>array('access ghost stats widgets'),
+  );
+
+  $items['stats/widgets.test.php'] = array(
+      'title' => '',
+    'page callback' => 'dgstats_widgets_test_page',
+    'access arguments' =>array('access ghost stats widgets'),
+  );
+
+  return $items;
+}
+
+
+
+
+function dgstats_widgets_perm(){
+  return array(
+    'access ghost stats widgets',
+
+  );
+}
+
+function dgstats_widgets_page(){
+
+}
+
+function dgstats_widgets_test_page(){
+    $debug = _dgstats_widgets_get_debug();
+
+    $type = _dgstats_widgets_get_type();
+
+    switch($type){
+      case DGSTATS_WIDGET_LAST_GAME:
+        dgstats_widgets_last_game();
+        break;
+      case DGSTATS_WIDGET_PLAYER:
+        dgstats_widgets_player();
+        break;
+      default:
+        print 'INVALID TYPE';
+        break;
+    }
+
+    
+    exit();
+}
+function _dgstats_widgets_get_type(){
+  if(isset($_REQUEST['type'])){
+    if(is_numeric($_REQUEST['type'])){
+      return $_REQUEST['type'];
+    } else {
+      return false;
+    }
+  } else {
+    return false;
+  }
+}
+function _dgstats_get_playername(){
+  if(isset($_REQUEST['playername'])){
+    if(is_string($_REQUEST['playername'])){
+      return check_plain($_REQUEST['playername']);
+    } else {
+      return false;
+    }
+  } else {
+    return false;
+  }
+}
+function _dgstats_widgets_get_debug(){
+
+}
+function _dgstats_widgets_get_debug_level(){
+
+}
+function dgstats_widgets_last_game(){
+  $lastgame = dgstats_get_last_game();
+  krumo($lastgame);
+}
+
+function dgstats_widgets_player(){
+  if($playername = _dgstats_get_playername()){
+    //krumo($playername);
+    if($player = player_load($playername)){
+      print theme('widget_player',$player);
+    } else {
+      drupal_not_found();
+    }
+
+  } else {
+    drupal_not_found();
+  }
+}
+function dgstats_widgets_theme(){
+  return array(
+   /* 'game' => array(
+      'arguments' => array('game' => null),
+      'template' => 'game',
+    ),*/
+    'player_resumen_widget' => array(
+      'arguments' => array('player' => null),
+    ),
+    'widget_player' => array(
+      'arguments' => array('player' => null),
+    ),
+
+  );
+}
+function theme_player_resumen_widget($player){
+  $output = '';
+  $header_player1 = array(
+    array('data' => 'Wins'),
+    array('data' => 'Losses'),
+    array('data' => 'Draws'),
+
+  );
+  $header_player2 = array(
+    array('data' => 'Kills'),
+    array('data' => 'Deaths'),
+    array('data' => 'Assists'),
+
+  );
+  $formated_player = dgstats_format_player_player_widget($player);
+ // krumo($player);
+  $output .= theme('table',$header_player1,array( $formated_player[0]));
+  $output .= theme('table',$header_player2, array($formated_player[1]));
+  return $output;
+}
+function theme_widget_player($player){
+   $output = '';
+   $data = '
+	Drupal.behaviors.dgstatstabs = function (){
+
+		$("#tabs").tabs();
+	
+}
+
+';
+//krumo($player);
+   drupal_add_js($data, 'inline');
+
+   drupal_add_css(drupal_get_path('module','dgstats') . '/css/baseWidget.css');
+   
+   $output .= _theme_widget_head();
+   $output .= '<body>';
+$output .= '<div id="main">';
+   $output .= '<div id="playername"><h1>' . $player['name'] . '</h1></div>';
+ /*  $output .= '<div id="tabs">
+    <ul>
+		<li><a href="#tabs-1">Nunc tincidunt</a></li>
+		<li><a href="#tabs-2">Ajax Tab 1</a></li>
+		<li><a href="#tabs-3">Ajax Tab 2</a></li>
+	</ul>
+	<div id="tabs-1">
+		<p>Proin elit arcu, rutrum commodo, vehicula tempus, commodo a, risus. Curabitur nec arcu. Donec sollicitudin mi sit amet mauris. Nam elementum quam ullamcorper ante. Etiam aliquet massa et lorem. Mauris dapibus lacus auctor risus. Aenean tempor ullamcorper leo. Vivamus sed magna quis ligula eleifend adipiscing. Duis orci. Aliquam sodales tortor vitae ipsum. Aliquam nulla. Duis aliquam molestie erat. Ut et mauris vel pede varius sollicitudin. Sed ut dolor nec orci tincidunt interdum. Phasellus ipsum. Nunc tristique tempus lectus.</p>
+	</div>';
+$output .= '<div id="tabs-2" class="resumen">';
+   $output .= _dgstats_widgets_bars($player);
+   $output .= '</div>';
+*/
+   $output .= '<div id="tabs-3" class="resumen">';
+   $output .= theme('player_resumen_widget',$player);
+   $output .= '</div>';
+//krumo($player);
+  // $output .= '</div>';
+
+  $output .= '<div id="lastgame">';
+  $lastgame = _format_lastgame($player['lastgame']);
+  $output .= theme('item_list',$lastgame,'Last game:');
+  $output .= '</div>';
+
+$output .= '</div>';
+   $output .= '</body>';
+   return $output;
+}
+function dgstats_format_player_player_widget($player){
+  $medias = dgstats_get_player_medias($player);
+  $mkill = $medias['kills'];
+  $mdeaths = $medias['deaths'];
+  $massists = $medias['assists'];
+
+  $percents = dgstats_get_player_percents($player);
+  $pwins = $percents['wins'];
+  $plosses = $percents['losses'];
+  $pdraws = $percents['draws'];
+
+  $formated_player1 = array();
+  $formated_player2 = array();
+
+
+
+
+  $formated_player1[] = $player['wins'] . " ($pwins%)";
+  $formated_player1[] = $player['losses'] . " ($plosses%)";
+  $formated_player1[] = $player['draws'] . " ($pdraws%)";
+
+  $formated_player2[] = $player['kills'] . " ($mkill)";
+  $formated_player2[] = $player['deaths'] . " ($mdeaths)";
+  $formated_player2[] = $player['assists'] . " ($massists)";
+  $formated_player = array($formated_player1,$formated_player2);
+
+  return $formated_player;
+}
+function _theme_widget_head(){
+
+  drupal_add_js(drupal_get_path('module', 'dgstats') . '/js/jquery-ui-1.6.custom.min');
+  drupal_add_css(drupal_get_path('module', 'dgstats') . '/css/ui-lightness/ui.all.css');
+  $styles = drupal_get_css();
+  $scripts = drupal_get_js();
+  //drupal_page_header();
+  $output .= '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+  <html>
+  <head>
+    <title></title>' .
+    $styles .
+    $scripts .
+    '</head>';
+
+    return $output;
+}
+function _dgstats_widgets_pie($player){
+  $percents = dgstats_get_player_percents($player);
+
+
+  $example = array(
+  '#type'     => 'pie3D', // Display a 3D pie chart
+  '#color'    => 'ffffff', // Background color, in RRGGBB format
+    '#height'   => 100, // in pixels
+  '#width'    => 200, // in pixels
+ // '#title'    => t('Example'), // Chart title
+
+  array(
+    array('#value' => $percents['wins'], '#label' =>'W'),
+    array('#value' => $percents['losses'], '#label' =>'L'),
+    array('#value' => $percents['draws'], '#label' => 'D'),
+  ),
+);
+return charts_chart($example);
+}
+
+function _dgstats_widgets_bars($player){
+  $medias = dgstats_get_player_medias($player);
+
+
+  $example = array(
+  '#type'     => 'vbar2D', // Display a 3D pie chart
+  '#color'    => 'ffffff', // Background color, in RRGGBB format
+    '#height'   => 100, // in pixels
+  '#width'    => 200, // in pixels
+ // '#title'    => t('Example'), // Chart title
+
+  array(
+    array('#color'=> '64c43c','#value' => $medias['kills'], '#label' =>'K'),
+    array('#color'=> 'b90000','#value' => $medias['deaths'], '#label' =>'D'),
+    array('#color'=> 'fbd648', '#value' => $medias['assists'], '#label' => 'A'),
+  ),
+);
+return charts_chart($example);
+}
+function _format_lastgame($lastgame){
+  $formated = array();
+  $formated['datetime']  = theme('game_datetime',$lastgame['datetime']);
+  $formated['duration']  = theme('game_duration',$lastgame['duration']);
+  $formated['team'] = theme('team',$lastgame['team']);
+  $formated['result'] = theme('gameresult',$lastgame['result']);
+  return $formated;
+}

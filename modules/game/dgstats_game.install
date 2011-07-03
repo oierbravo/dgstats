@@ -1,0 +1,141 @@
+<?php
+/**
+ *  Project: Drupal Ghost Stats
+ *
+ *  Copyright (C) 2009 Oier Bravo Urtasun
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Affero General Public License as
+ *    published by the Free Software Foundation, either version 3 of the
+ *    License, or (at your option) any later version.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/**
+ * Implementation of hook_install() 
+ */
+function dgstats_game_install() {
+    drupal_install_schema('dgstats_game');
+}
+
+
+/**
+ * Implementation of hook_unistall() 
+ */
+function dgstats_game_unistall() {
+    drupal_uninstall_schema('dgstats_game');
+}
+function dgstats_game_schema(){
+
+  $schema = array();
+
+  $schema['dgstats_game'] = array(
+  'description' => 'Store game info',
+    'fields' => array(
+      'gameid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => "Ghost game id reference",
+      ),
+      'nid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => "The game's {node}.nid.",
+      ),
+      'datetime' => array(
+        'type' => 'datetime',
+//        'unsigned' => TRUE,
+//        'not null' => TRUE,
+//        'default' => 0,
+        'description' => "The game's SQL datetime play date.",
+      ),
+      'gamename' => array(
+        'description' => 'The name of this game, always treated as non-markup plain text.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'gametype' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => "The game's type: private/public.",
+      ),
+      'creator' => array(
+        'description' => 'The creator of this game, always treated as non-markup plain text.',
+        'type' => 'varchar',
+        'length' => 16, //battle.net limitation
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'owner' => array(
+        'description' => 'The owner of this game, always treated as non-markup plain text.',
+        'type' => 'varchar',
+        'length' => 16, //battle.net limitation
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'duration' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => "The game's duration.",
+      ),
+      'winner' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => "The game's winner.",
+      ),
+      'server' => array(
+        'description' => 'The server of this game, always treated as non-markup plain text.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'map' => array(
+        'description' => "The map of this game, always treated as non-markup plain text.",
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'botid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => "The game's type: private/public.",
+      ),
+      'gamestatus' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => "The game's status: 0-non processed / 1-processed / 2- processing",
+      ),
+
+    ),
+    'primary key' => array('gameid'),
+    'unique keys' => array(
+      'nid' => array('nid'),
+    ),
+  );
+
+  return $schema;
+}

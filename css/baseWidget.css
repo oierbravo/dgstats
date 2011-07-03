@@ -1,0 +1,23 @@
+/* 
+    Document   : baseWidget
+    Created on : 16-ago-2009, 16:48:07
+    Author     : oier
+    Description:
+        Purpose of the stylesheet follows.
+*/
+
+/* 
+   TODO customize this sample style
+   Syntax recommendation http://www.w3.org/TR/REC-CSS2/
+*/
+
+root { 
+    display: block;
+}
+
+#main {
+  display:block;
+  width:250px;
+  height:100px;
+}
+
